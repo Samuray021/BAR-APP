@@ -49,11 +49,7 @@ body{background:radial-gradient(ellipse at 50% -28%,#414943 0,transparent 52%),l
 
 
 /* BAR ASSIST stone-grey palette refinement */
-.app-shell,
-.app-shell.accent-green,
-.app-shell.accent-blue,
-.app-shell.accent-orange,
-.app-shell.accent-purple{
+ .app-shell{
   --bg:#202326;
   --panel:#292d30;
   --panel2:#34393c;
@@ -132,3 +128,37 @@ body{
 .splash-emblem{width:104px;height:104px;margin-bottom:27px;filter:drop-shadow(0 14px 22px #0009)}
 .splash-emblem img{display:block;width:100%;height:100%;object-fit:contain}
 @media(max-width:520px){.brand-image{width:40px;height:40px}.compact .brand-image{width:36px;height:36px}.brand-lockup.compact>div:last-child small{font-size:8px}}
+
+
+/* Bright, functional accent themes */
+.app-shell.accent-green{--accent:#a8ed59;--accent2:#76c832}
+.app-shell.accent-blue{--accent:#59b8ff;--accent2:#268fe0}
+.app-shell.accent-orange{--accent:#ffad55;--accent2:#ec7d25}
+.app-shell.accent-purple{--accent:#c39aff;--accent2:#9863e8}
+.app-shell .primary-btn{
+  background:linear-gradient(145deg,var(--accent),var(--accent2));
+  color:#171b1e;
+  border:1px solid color-mix(in srgb,var(--accent) 70%,white);
+  box-shadow:0 4px 14px color-mix(in srgb,var(--accent) 22%,transparent);
+}
+.app-shell .nav-item.active,.app-shell .mobile-item.active{
+  color:var(--accent);
+  background:color-mix(in srgb,var(--accent) 14%,transparent);
+}
+.app-shell .recipe-card-foot b,.app-shell .schedule-shift-time,
+.app-shell .hours-value,.app-shell .ingredient-list b,
+.app-shell .editor-label,.app-shell .eyebrow,.app-shell .side-label{
+  color:var(--accent);
+}
+.app-shell .status-dot{background:var(--accent);box-shadow:0 0 9px color-mix(in srgb,var(--accent) 70%,transparent)}
+.app-shell .swatch.selected{outline:3px solid var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 28%,transparent)}
+.app-shell .login-form input:focus,.app-shell .editor-panel input:focus,
+.app-shell .editor-panel textarea:focus,.app-shell .ops-form input:focus,
+.app-shell .ops-form select:focus,.app-shell .ops-card input:focus,
+.app-shell .ops-card select:focus,.app-shell .ops-card textarea:focus{
+  border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 18%,transparent)
+}
+.app-shell .category-chip.chosen{background:color-mix(in srgb,var(--accent) 17%,#292d30);border-color:var(--accent2);color:var(--accent)}
+.app-shell .user-avatar{background:color-mix(in srgb,var(--accent) 18%,#292d30);color:var(--accent)}
+.swatch{width:42px;height:42px;border:2px solid #202326;outline:1px solid #697174;transition:transform .15s,box-shadow .15s}
+.swatch:hover{transform:scale(1.08)}
