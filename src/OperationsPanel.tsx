@@ -46,7 +46,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  const loadTeam=async()=>{const {data,error}=await supabase.from('staff').select('id,name,username,role,active,auth_user_id').order('name');if(error)report(error.message);else setStaffRows((data||[]) as Staff[])}
  const loadShifts=async()=>{
   const from=weekStart.toISOString(),to=weekFinish.toISOString()
-  let q=supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff(name)').lt('starts_at',to).gt('ends_at',from).order('starts_at')
+  let q=supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff:staff!schedule_shifts_staff_id_fkey(name)').lt('starts_at',to).gt('ends_at',from).order('starts_at')
   if(!manager)q=q.eq('staff_id',staff.id)
   const {data,error}=await q
   if(error){report(error.message);return}
