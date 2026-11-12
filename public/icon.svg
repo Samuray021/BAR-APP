@@ -1,1 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128"><rect width="128" height="128" rx="30" fill="#b5c79a"/><path d="M39 27h35c23 0 34 11 34 28 0 11-6 19-16 23 13 3 20 12 20 25 0 18-13 28-36 28H39V27zm24 20v24h10c8 0 12-4 12-12s-4-12-12-12H63zm0 42v23h13c9 0 13-4 13-12s-4-11-13-11H63z" fill="#172017" transform="translate(-6 -9)"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+<defs><linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#d2d1c5"/><stop offset=".42" stop-color="#858d83"/><stop offset=".7" stop-color="#b8baad"/><stop offset="1" stop-color="#59645b"/></linearGradient><linearGradient id="cut" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#343b35"/><stop offset="1" stop-color="#101612"/></linearGradient><filter id="grain"><feTurbulence type="fractalNoise" baseFrequency=".7" numOctaves="3" stitchTiles="stitch"/><feColorMatrix values=".35 0 0 0 .2 .35 0 0 0 .2 .35 0 0 0 .2 0 0 0 .16 0"/></filter></defs>
+<rect width="128" height="128" rx="30" fill="#202622"/>
+<path d="M64 7 111 34v60l-47 27L17 94V34L64 7Z" fill="url(#stone)" stroke="#d4d5ca" stroke-width="2"/>
+<path d="m64 13 41 24v53l-41 24-41-24V37L64 13Z" fill="none" stroke="#424a43" stroke-opacity=".7" stroke-width="1.5"/>
+<path d="M39 39h22c14 0 21 7 21 18 0 7-4 12-11 15 9 2 14 8 14 17 0 13-9 20-25 20H39V39Zm15 12v16h7c5 0 8-3 8-8s-3-8-8-8h-7Zm0 28v18h9c6 0 9-3 9-9s-3-9-9-9h-9Z" fill="url(#cut)" stroke="#d6d5c9" stroke-opacity=".38" stroke-width=".7"/>
+<path d="M30 29 64 10l34 19" fill="none" stroke="#f1f0e6" stroke-opacity=".55" stroke-width="1.4"/>
+<rect width="128" height="128" rx="30" filter="url(#grain)" opacity=".35"/>
+</svg>
