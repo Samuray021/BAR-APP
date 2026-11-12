@@ -112,43 +112,104 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   const link=document.createElement('a')
   link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
  }
+
  const exportSchedule=async()=>{
   if(!manager)return
   setExporting('schedule')
   try{
-   const rows: any[]=[]
+   const shifts: any[]=[]
    for(let from=0;;from+=1000){
-    const {data,error}=await supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff:staff!schedule_shifts_staff_id_fkey(name)').order('starts_at').range(from,from+999)
+    const {data,error}=await supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note').order('starts_at').range(from,from+999)
     if(error)throw error
-    rows.push(...(data||[]))
+    shifts.push(...(data||[]))
     if(!data||data.length<1000)break
+   }
+   const {data:employees,error:staffError}=await supabase.from('staff').select('id,name').order('name')
+   if(staffError)throw staffError
+   const staffList=(employees||[]) as {id:string;name:string}[]
+   const employeeNames=new Map(staffList.map(x=>[x.id,x.name]))
+   const monthBuckets=new Map<string,Map<string,number[]>>()
+   const ensureMonth=(year:number,month:number)=>{
+    const key=year+'-'+pad(month+1)
+    if(!monthBuckets.has(key))monthBuckets.set(key,new Map())
+    return monthBuckets.get(key)!
+   }
+   const addShiftToDays=(shift:any)=>{
+    let cursor=new Date(shift.starts_at)
+    const finish=new Date(shift.ends_at)
+    if(!Number.isFinite(cursor.getTime())||!Number.isFinite(finish.getTime())||finish<=cursor)return
+    while(cursor<finish){
+     const year=cursor.getFullYear(),month=cursor.getMonth(),day=cursor.getDate()
+     const nextDay=new Date(year,month,day+1)
+     const segmentEnd=new Date(Math.min(finish.getTime(),nextDay.getTime()))
+     const hours=(segmentEnd.getTime()-cursor.getTime())/3600000
+     const bucket=ensureMonth(year,month)
+     if(!bucket.has(shift.staff_id))bucket.set(shift.staff_id,Array(31).fill(0))
+     bucket.get(shift.staff_id)![day-1]+=hours
+     cursor=segmentEnd
+    }
+   }
+   shifts.forEach(addShiftToDays)
+   if(monthBuckets.size===0){
+    const now=new Date()
+    ensureMonth(now.getFullYear(),now.getMonth())
    }
    const workbook=new ExcelJS.Workbook()
    workbook.creator='BAR APP'
    workbook.created=new Date()
-   const sheet=workbook.addWorksheet('График')
-   sheet.columns=[
-    {header:'Сотрудник',key:'employee',width:28},
-    {header:'Дата',key:'date',width:15},
-    {header:'Начало',key:'start',width:12},
-    {header:'Окончание',key:'end',width:12},
-    {header:'Часы',key:'hours',width:12},
-    {header:'Комментарий',key:'note',width:42}
-   ]
-   rows.forEach(s=>{
-    const start=new Date(s.starts_at),end=new Date(s.ends_at)
-    sheet.addRow({
-     employee:s.staff?.name||staffRows.find(x=>x.id===s.staff_id)?.name||'Сотрудник',
-     date:start.toLocaleDateString('ru-RU'),
-     start:start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),
-     end:end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),
-     hours:Number(hoursBetween(s.starts_at,s.ends_at).toFixed(2)),
-     note:s.note||''
+   const monthKeys=[...monthBuckets.keys()].sort()
+   monthKeys.forEach(key=>{
+    const [yearText,monthText]=key.split('-')
+    const year=Number(yearText),month=Number(monthText)-1
+    const title=new Date(year,month,1).toLocaleDateString('ru-RU',{month:'long',year:'numeric'})
+    const sheet=workbook.addWorksheet(title.charAt(0).toUpperCase()+title.slice(1))
+    sheet.columns=[
+     {header:'ИМЯ',key:'employee',width:27},
+     ...Array.from({length:31},(_,i)=>({header:String(i+1),key:'day'+(i+1),width:6})),
+     {header:'ИТОГО ЧАСОВ',key:'total',width:16}
+    ]
+    const bucket=monthBuckets.get(key)!
+    const sortedStaff=[...staffList].sort((a,b)=>a.name.localeCompare(b.name,'ru'))
+    sortedStaff.forEach(person=>{
+     const daily=bucket.get(person.id)||Array(31).fill(0)
+     const row:any={employee:person.name}
+     let total=0
+     daily.forEach((hours:number,index:number)=>{
+      if(hours>0){
+       const rounded=Number(hours.toFixed(2))
+       row['day'+(index+1)]=rounded
+       total+=hours
+      }
+     })
+     row.total=Number(total.toFixed(2))
+     sheet.addRow(row)
     })
+    sheet.views=[{state:'frozen',xSplit:1,ySplit:1}]
+    sheet.autoFilter={from:{row:1,column:1},to:{row:1,column:33}}
+    const header=sheet.getRow(1)
+    header.height=30
+    header.eachCell(cell=>{
+     cell.font={bold:true,color:{argb:'FFFFFFFF'},size:10}
+     cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF344536'}}
+     cell.alignment={vertical:'middle',horizontal:'center',wrapText:true}
+     cell.border={top:{style:'thin',color:{argb:'FF879C6B'}},left:{style:'thin',color:{argb:'FF879C6B'}},bottom:{style:'thin',color:{argb:'FF879C6B'}},right:{style:'thin',color:{argb:'FF879C6B'}}}
+    })
+    sheet.eachRow((row,index)=>{
+     if(index===1)return
+     row.height=24
+     row.eachCell({includeEmpty:true},(cell,col)=>{
+      cell.alignment={vertical:'middle',horizontal:col===1?'left':'center'}
+      cell.border={top:{style:'thin',color:{argb:'FFD5DDD3'}},left:{style:'thin',color:{argb:'FFD5DDD3'}},bottom:{style:'thin',color:{argb:'FFD5DDD3'}},right:{style:'thin',color:{argb:'FFD5DDD3'}}}
+      if(col>1)cell.numFmt='0.##'
+      if(col===33){cell.font={bold:true};cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFE8EEE4'}}}
+     })
+    })
+    sheet.getColumn(1).alignment={vertical:'middle',horizontal:'left'}
+    sheet.getColumn(33).numFmt='0.##'
    })
-   styleWorksheet(sheet)
-   await downloadWorkbook(workbook,'BAR-APP-grafik-'+dateKey(new Date())+'.xlsx')
-   report('График выгружен: '+rows.length+' смен')
+   const filename='BAR-APP-grafik-po-mesyatsam-'+dateKey(new Date())+'.xlsx'
+   await downloadWorkbook(workbook,filename)
+   report('График выгружен: '+monthKeys.length+' мес., '+staffList.length+' сотрудников')
   }catch(e){report(e instanceof Error?'Не удалось выгрузить график: '+e.message:'Не удалось выгрузить график')}
   finally{setExporting(null)}
  }
