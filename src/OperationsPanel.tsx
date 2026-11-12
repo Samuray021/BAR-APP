@@ -52,7 +52,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   const from=weekStart.toISOString(),to=weekFinish.toISOString()
   const {data,error}=await supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note').lt('starts_at',to).gt('ends_at',from).order('starts_at')
   if(error){report(error.message);return}
-  const {data:directory,error:directoryError}=await supabase.from('staff_directory').select('id,name')
+  const {data:directory,error:directoryError}=await supabase.rpc('get_staff_directory')
   if(directoryError){report(directoryError.message);return}
   const people=(directory||[]) as StaffDirectoryEntry[]
   setStaffDirectory(people)
