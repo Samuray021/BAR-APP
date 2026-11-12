@@ -1,0 +1,671 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#171b19">
+<title>BAR APP — техкарты</title>
+<style>
+:root{--bg:#151916;--panel:#202722;--panel2:#28312b;--line:#354038;--text:#f0f2ec;--muted:#aab4a8;--olive:#a3b889;--olive2:#748b61;--danger:#d49a87}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;min-height:100vh}
+.app{max-width:540px;margin:auto;min-height:100vh;padding:env(safe-area-inset-top) 16px calc(86px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;padding:18px 2px 22px}
+.brand{font-weight:850;letter-spacing:2px;font-size:18px}.brand span{color:var(--olive)}
+.role-btn{border:1px solid var(--line);background:var(--panel);color:var(--olive);padding:8px 12px;border-radius:12px;font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px}
+.role-btn:hover{border-color:var(--olive)}
+h1{font-size:27px;line-height:1.12;margin:8px 0 7px;letter-spacing:-.6px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:19px}
+.search{display:flex;gap:10px;background:var(--panel);border:1px solid var(--line);padding:14px;border-radius:16px;align-items:center}
+.search input{background:transparent;border:0;outline:0;color:var(--text);font-size:15px;width:100%}
+.search input::placeholder{color:#89948a}
+.sectionhead{display:flex;justify-content:space-between;align-items:center;margin:23px 0 12px}
+.sectionhead b{font-size:15px}
+.count{font-size:12px;color:var(--muted)}
+.filters{display:flex;gap:8px;overflow:auto;padding-bottom:5px;scrollbar-width:none}.filters::-webkit-scrollbar{display:none}
+.chip{white-space:nowrap;border:1px solid var(--line);border-radius:30px;padding:9px 13px;background:var(--panel);color:var(--muted);font-size:12px;cursor:pointer}
+.chip.active{background:var(--olive);color:#182018;border-color:var(--olive);font-weight:700}
+.list{display:grid;gap:10px}
+.recipe{display:flex;align-items:center;gap:13px;padding:13px;background:linear-gradient(135deg,var(--panel),#1c231e);border:1px solid var(--line);border-radius:17px;color:inherit;text-align:left;width:100%;cursor:pointer}
+.monogram{width:54px;height:54px;border-radius:14px;display:grid;place-items:center;background:#354337;color:#c3d3b3;font-size:20px;font-weight:800;flex-shrink:0}
+.recipe-main{min-width:0;flex:1}
+.recipe-name{font-size:15px;font-weight:700;margin-bottom:5px}
+.recipe-meta{font-size:11px;color:var(--muted)}
+.arrow{color:var(--olive);font-size:20px}
+.empty{padding:28px 16px;text-align:center;color:var(--muted);background:var(--panel);border:1px dashed var(--line);border-radius:16px}
+nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(540px,100%);display:flex;justify-content:space-around;background:#1b211d;border-top:1px solid var(--line);padding:12px 8px calc(12px + env(safe-area-inset-bottom));z-index:5}
+.navitem{font-size:10px;color:var(--muted);text-align:center;display:grid;gap:4px;justify-items:center;cursor:pointer;flex:1}
+.navitem.active{color:var(--olive)}
+.navicon{font-size:18px}
+.detail{display:none}.detail.show{display:block}.catalog.hide{display:none}
+.back{background:none;border:0;color:var(--olive);font-size:14px;padding:6px 0 18px;cursor:pointer}
+.hero{background:radial-gradient(circle at 85% 20%,#526548 0,#2c392f 28%,#202722 70%);border:1px solid #43513f;border-radius:22px;padding:20px;margin-bottom:16px}
+.hero .tag{font-size:11px;color:#d0dfc2}
+.hero h1{margin:14px 0 8px;font-size:28px}
+.hero p{color:#c2cdbd;font-size:12px;margin:0}
+.stats{display:flex;gap:8px;margin-top:18px}
+.stat{background:#ffffff12;border:1px solid #ffffff18;padding:9px 11px;border-radius:12px;font-size:11px;color:#e5ecdf}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:17px;padding:16px;margin:12px 0}
+.panel h3{font-size:14px;margin:0 0 14px}
+.ingredient{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #303a32;font-size:13px}
+.ingredient:last-child{border:0;padding-bottom:0}
+.amount{color:var(--olive);font-weight:700;white-space:nowrap}
+.muted{color:var(--muted);font-size:12px;line-height:1.55;white-space:pre-wrap}
+.yieldrow{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.step{line-height:1.6;font-size:13px;white-space:pre-wrap}
+.calc{display:flex;align-items:center;gap:10px}
+.calc input{width:70px;background:#151b17;border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:15px}
+.tiny{font-size:11px;color:var(--muted)}
+.notice{font-size:10px;color:#b8c2b6;line-height:1.45;margin-top:12px}
+
+/* Управление и модальные окна */
+.btn{background:var(--olive);color:#182018;border:0;padding:10px 14px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px}
+.btn-danger{background:var(--danger);color:#2b1515}
+.btn-outline{background:transparent;border:1px solid var(--line);color:var(--text)}
+.manager-only{display:none!important}
+body.is-manager .manager-only{display:flex!important}
+body.is-manager .manager-only-block{display:block!important}
+.manager-only-block{display:none!important}
+
+.modal{position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(3px);display:none;justify-content:center;align-items:center;z-index:100;padding:16px}
+.modal.show{display:flex}
+.modal-content{background:var(--panel2);border:1px solid var(--line);border-radius:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:22px}
+.modal-content h2{margin:0 0 16px;font-size:20px}
+.form-group{margin-bottom:12px}
+.form-group label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px}
+.form-group input,.form-group textarea{width:100%;background:#151b17;border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:14px;outline:none}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--olive)}
+.form-group textarea{resize:vertical;height:75px}
+.ing-row{display:flex;gap:6px;margin-bottom:6px;align-items:center}
+.ing-row input:first-child{flex:2}
+.ing-row input:nth-child(2){flex:1}
+.auth-card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.auth-card.active-role{border-color:var(--olive);background:#253027}
+.pin-box{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
+.pin-box.show{display:block}
+.error-msg{color:var(--danger);font-size:12px;margin-top:6px;display:none}
+.staff-row{display:flex;justify-content:space-between;align-items:center;background:#151b17;padding:8px 12px;border-radius:10px;margin-bottom:6px;font-size:13px}
+.sync-status{font-size:11px;color:var(--olive);text-align:right;margin-bottom:6px}
+
+/* Личные цветовые темы */
+body[data-theme="blue"]{--olive:#168bff;--olive2:#075bb5}
+body[data-theme="orange"]{--olive:#ff8a24;--olive2:#bd5700}
+body[data-theme="purple"]{--olive:#a855f7;--olive2:#7133b5}
+body[data-theme="green"]{--olive:#22c55e;--olive2:#16803d}
+body .monogram{background:color-mix(in srgb,var(--olive) 22%,#202722);color:var(--olive)}
+body .hero{background:radial-gradient(circle at 85% 20%,var(--olive2) 0,#2c392f 35%,#202722 75%);border-color:var(--olive2)}
+.settings{display:none}.settings.show{display:block}
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.theme-option{background:var(--panel);border:1px solid var(--line);color:var(--text);border-radius:14px;padding:13px;display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;text-align:left;min-width:0}
+.theme-option.active{border-color:var(--olive);background:var(--panel2)}
+.theme-dot{width:24px;height:24px;border-radius:50%;flex-shrink:0}
+.theme-option.active::after{content:"✓";margin-left:auto;color:var(--olive);font-weight:800}
+
+/* Pull to Refresh */
+.pull-indicator{position:fixed;z-index:200;top:-60px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);color:var(--olive);border-radius:30px;padding:10px 16px;font-size:12px;display:flex;align-items:center;gap:9px;box-shadow:0 4px 20px #0005;transition:top .15s ease;white-space:nowrap;pointer-events:none}
+.pull-spinner{width:15px;height:15px;border:2px solid var(--line);border-top-color:var(--olive);border-radius:50%}
+.pull-indicator.loading .pull-spinner{animation:pullSpin .7s linear infinite}
+@keyframes pullSpin{to{transform:rotate(360deg)}}
+@media(min-width:540px){body{background:#101411}.app{border-left:1px solid #202820;border-right:1px solid #202820}}
+</style>
+</head>
+<body>
+<div class="pull-indicator" id="pullIndicator"><span class="pull-spinner"></span><span id="pullText">Потяните для обновления</span></div>
+<main class="app">
+<header>
+  <div class="brand">BAR<span>APP</span></div>
+  <button class="role-btn" id="openAuthBtn"><span id="roleIndicator">●</span> <span id="roleLabel">Бармен</span> ▾</button>
+</header>
+
+<section class="catalog" id="catalog">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
+    <div><h1>Что будем<br>готовить?</h1><div class="sub">Облачные технологические карты</div></div>
+    <button class="btn manager-only" id="addBtn" style="margin-top:8px;white-space:nowrap;">+ Добавить</button>
+  </div>
+  <div class="sync-status" id="syncStatus">☁ Синхронизация с облаком...</div>
+  <div class="search"><span>⌕</span><input id="q" placeholder="Название или ингредиент" autocomplete="off"><span style="color:var(--muted)">⌘</span></div>
+  <div class="sectionhead"><b>Категории</b><span class="count">Фильтр</span></div>
+  <div class="filters" id="filters"></div>
+  <div class="sectionhead"><b id="listTitle">Все напитки</b><span class="count" id="count"></span></div>
+  <div class="list" id="list"></div>
+</section>
+
+<section class="detail" id="detail"><button class="back" id="back">← К каталогу</button><div id="detailBody"></div></section>
+
+<section class="settings" id="settings">
+  <h1>Настройки</h1>
+  <div class="sub">Персональное оформление профиля</div>
+  <div class="panel">
+    <h3>Текущий профиль</h3>
+    <div id="settingsUser" style="font-weight:700"></div>
+    <div class="tiny" style="margin-top:5px">Настройки сохраняются отдельно для каждого сотрудника.</div>
+  </div>
+  <div class="panel">
+    <h3>Цвет интерфейса</h3>
+    <div class="theme-grid" id="themeGrid">
+      <button type="button" class="theme-option" data-theme-choice="blue"><span class="theme-dot" style="background:#168bff"></span>Неоновый синий</button>
+      <button type="button" class="theme-option" data-theme-choice="orange"><span class="theme-dot" style="background:#ff8a24"></span>Оранжевый</button>
+      <button type="button" class="theme-option" data-theme-choice="purple"><span class="theme-dot" style="background:#a855f7"></span>Фиолетовый</button>
+      <button type="button" class="theme-option" data-theme-choice="green"><span class="theme-dot" style="background:#22c55e"></span>Зелёный</button>
+    </div>
+    <div class="tiny" id="themeStatus" style="margin-top:12px">Выберите цвет оформления.</div>
+  </div>
+</section>
+</main>
+
+<!-- Окно авторизации / выбора роли -->
+<div class="modal" id="authModal">
+  <div class="modal-content">
+    <h2>Вход в систему</h2>
+    <p class="tiny" style="margin-bottom:12px;">Выберите сотрудника или управляющего:</p>
+    <div class="form-group">
+      <select id="userSelect" style="width:100%;background:#151b17;border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:14px;outline:none;"><option value="manager">Управляющий (Master PIN)</option></select>
+    </div>
+    <div class="form-group"><label>PIN-код</label><input type="password" id="loginPin" placeholder="••••" maxlength="6" style="font-size:18px;letter-spacing:4px;"></div>
+    <button class="btn" id="loginBtn" style="width:100%;margin-top:6px;">Войти</button>
+    <div class="manager-only-block" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">
+      <h3 style="font-size:14px;margin-bottom:8px;">Управление персоналом (Бармены)</h3>
+      <div id="staffList"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <input type="text" id="newStaffName" placeholder="Имя бармена" style="flex:2;min-width:0;">
+        <input type="password" id="newStaffPin" placeholder="PIN" style="flex:1;min-width:0;" maxlength="6">
+        <button class="btn" id="addStaffBtn" style="font-size:12px;padding:8px;white-space:nowrap;">+ Добавить</button>
+      </div>
+    </div>
+    <button class="btn btn-outline" id="closeAuthBtn" style="width:100%;margin-top:14px;">Закрыть</button>
+  </div>
+</div>
+
+<!-- Окно добавления / редактирования ТТК -->
+<div class="modal" id="recipeModal">
+  <div class="modal-content">
+    <h2 id="modalTitle">Новая техкарта</h2>
+    <form id="recipeForm">
+      <input type="hidden" id="editId">
+      <div class="form-group"><label>Название напитка *</label><input type="text" id="fName" required placeholder="Например: Негрони"></div>
+      <div class="form-group">
+        <label>Категория *</label><input type="text" id="fCategory" required placeholder="Коктейли, Шоты, Настойки..." list="catList">
+        <datalist id="catList"><option value="Коктейли"><option value="Шоты"><option value="Настойки"><option value="Чайники"><option value="Лимонады"><option value="Сеты шотов"></datalist>
+      </div>
+      <div class="form-group"><label>Ингредиенты *</label><div id="ingredientsContainer"></div><button type="button" class="btn btn-outline" id="addIngBtn" style="margin-top:6px;font-size:12px;padding:7px 12px;">+ Добавить ингредиент</button></div>
+      <div class="form-group"><label>Способ приготовления</label><textarea id="fPrep" placeholder="Опишите метод и последовательность..."></textarea></div>
+      <div style="display:flex;gap:10px;">
+        <div class="form-group" style="flex:1"><label>Выход (мл/г)</label><input type="number" step="0.1" id="fYield" value="250"></div>
+        <div class="form-group" style="flex:1"><label>Цена (₽)</label><input type="number" step="0.1" id="fPrice" placeholder="250"></div>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <div class="form-group" style="flex:1"><label>Посуда</label><input type="text" id="fVessel" placeholder="Хайболл / Шот"></div>
+        <div class="form-group" style="flex:1"><label>Себестоимость (₽)</label><input type="number" step="0.01" id="fCost" placeholder="50.00"></div>
+      </div>
+      <div class="form-group"><label>Примечания</label><input type="text" id="fNote" placeholder="Например: Только в iiko"></div>
+      <div style="display:flex;gap:10px;margin-top:18px;"><button type="submit" class="btn" style="flex:1;">Сохранить в облако</button><button type="button" class="btn btn-outline" id="closeModal" style="flex:1;">Отмена</button></div>
+    </form>
+  </div>
+</div>
+
+<nav>
+  <div class="navitem active" id="navHome"><span class="navicon">⌂</span>Главная</div>
+  <div class="navitem" id="navSearch"><span class="navicon">⌕</span>Поиск</div>
+  <div class="navitem" id="navAuth"><span class="navicon">◉</span>Доступ</div>
+  <div class="navitem" id="navSettings"><span class="navicon">⚙</span>Настройки</div>
+</nav>
+
+<script>
+// =========================================================================
+// НАСТРОЙКА ОБЛАЧНОГО ХРАНИЛИЩА
+// =========================================================================
+const BIN_ID = "6af5b436ac6210605a8247c3";
+const API_KEY = "$2a$10$e0tnwD9mty6LUdu53g2Dfuc4R48jVV57ZPhll4IcndpOe0W31LbyK";
+const MANAGER_PIN = "1234"; // PIN управляющего по умолчанию
+
+let db = {
+  recipes: [
+    {"id":"r4","name":"Лимончелло","category":"Настойки","ingredients":[{"name":"Лимончелло  п/ф","amount":40.0}],"preparation":"","yield":40.0,"vessel":"Стопка «Бостон шот» 40мл","cost":16.81,"price":250.0,"note":"","source_row":4},
+    {"id":"r6","name":"Клюквенная","category":"Настойки","ingredients":[{"name":"Клюквенная настойка п/ф","amount":40.0}],"preparation":"","yield":40.0,"vessel":"Стопка «Бостон шот» 40мл","cost":29.14,"price":250.0,"note":"","source_row":6},
+    {"id":"r9","name":"Боярский","category":"Шоты","ingredients":[{"name":"Водка хаус","amount":30.0},{"name":"Сироп в асс (гренадин)","amount":10.0},{"name":"Табаско","amount":2.0}],"preparation":"Взять чистый сухой шот, налить слоями по барной ложке, сначала Сироп гренадин, затем водку, в конце добавить тобаско 2 капли.\nМетод: Лейринг","yield":40.0,"vessel":"Стопка «Бостон шот» 40мл","cost":36.18,"price":250.0,"note":"","source_row":9}
+  ],
+  staff: [],
+  profiles: {}
+};
+
+let currentUser = { name: "Бармен", role: "bartender" };
+let currentTheme = 'blue';
+let active = 'Все', query = '', currentDetailId = null;
+const $ = id => document.getElementById(id);
+
+function getProfileKey() {
+  return currentUser.role === 'manager' ? 'manager' : 'bartender:' + currentUser.name;
+}
+
+function renderSettings() {
+  $('settingsUser').textContent = currentUser.name + (currentUser.role === 'manager' ? ' · Управляющий' : ' · Бармен');
+  document.querySelectorAll('[data-theme-choice]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.themeChoice === currentTheme);
+  });
+}
+
+function applyProfileTheme() {
+  if (!db.profiles) db.profiles = {};
+  const savedTheme = db.profiles[getProfileKey()];
+  currentTheme = ['blue','orange','purple','green'].includes(savedTheme) ? savedTheme : 'blue';
+  document.body.dataset.theme = currentTheme;
+  renderSettings();
+}
+
+// Загрузка данных из облака
+async function loadFromCloud() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: { "X-Master-Key": API_KEY },
+      cache: 'no-store'
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if (!data.record || !Array.isArray(data.record.recipes)) throw new Error('Некорректная структура облачной базы');
+
+    db = data.record;
+    if (!Array.isArray(db.staff)) db.staff = [];
+    if (!db.profiles || typeof db.profiles !== 'object') db.profiles = {};
+
+    $('syncStatus').textContent = "☁ Облачная база загружена";
+    updateStaffSelect();
+    applyProfileTheme();
+    drawFilters();
+    drawList();
+    return true;
+  } catch (e) {
+    console.error('Ошибка загрузки JSONBin:', e);
+    $('syncStatus').textContent = "⚠ Ошибка загрузки из облака";
+    drawFilters();
+    drawList();
+    return false;
+  }
+}
+
+// Сохранение в облако
+async function saveToCloud() {
+  $('syncStatus').textContent = "☁ Сохранение...";
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "X-Master-Key": API_KEY },
+      body: JSON.stringify(db)
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    $('syncStatus').textContent = "☁ Изменения сохранены в облаке";
+    return true;
+  } catch (e) {
+    console.error('Ошибка сохранения JSONBin:', e);
+    $('syncStatus').textContent = "⚠ Ошибка сохранения в облако";
+    return false;
+  }
+}
+
+function updateStaffSelect() {
+  const select = $('userSelect');
+  let html = `<option value="manager">Управляющий (Master PIN)</option>`;
+  db.staff.forEach(s => { html += `<option value="${esc(s.name)}">${esc(s.name)} (Бармен)</option>`; });
+  select.innerHTML = html;
+
+  let staffHtml = '';
+  db.staff.forEach((s, idx) => {
+    staffHtml += `<div class="staff-row"><span><b>${esc(s.name)}</b> (PIN: ${esc(s.pin)})</span> <button class="btn btn-danger" style="padding:4px 8px;font-size:10px;" onclick="removeStaff(${idx})">Удалить</button></div>`;
+  });
+  $('staffList').innerHTML = staffHtml || '<div class="tiny" style="color:var(--muted)">Нет добавленных барменов</div>';
+}
+
+window.removeStaff = async idx => {
+  if (!confirm('Удалить этого бармена?')) return;
+  const removed = db.staff[idx];
+  db.staff.splice(idx, 1);
+  if (removed) delete db.profiles['bartender:' + removed.name];
+  await saveToCloud();
+  updateStaffSelect();
+};
+
+$('addStaffBtn').onclick = async () => {
+  const name = $('newStaffName').value.trim();
+  const pin = $('newStaffPin').value.trim();
+  if (!name || !pin) return alert('Введите имя и PIN бармена');
+  if (db.staff.some(s => s.name.toLowerCase() === name.toLowerCase())) return alert('Сотрудник с таким именем уже существует');
+  db.staff.push({ name, pin });
+  const saved = await saveToCloud();
+  $('newStaffName').value = '';
+  $('newStaffPin').value = '';
+  updateStaffSelect();
+  alert(saved ? 'Бармен успешно добавлен!' : 'Бармен добавлен локально, но не удалось сохранить изменения в облаке.');
+};
+
+$('loginBtn').onclick = () => {
+  const user = $('userSelect').value;
+  const pin = $('loginPin').value;
+  let success = false;
+
+  if (user === 'manager') {
+    if (pin === MANAGER_PIN) {
+      currentUser = { name: 'Управляющий', role: 'manager' };
+      document.body.classList.add('is-manager');
+      $('roleLabel').textContent = 'Управляющий';
+      $('roleIndicator').style.color = '#a3b889';
+      success = true;
+    } else alert('Неверный PIN управляющего');
+  } else {
+    const staffMember = db.staff.find(s => s.name === user);
+    if (staffMember && staffMember.pin === pin) {
+      currentUser = { name: staffMember.name, role: 'bartender' };
+      document.body.classList.remove('is-manager');
+      $('roleLabel').textContent = staffMember.name;
+      $('roleIndicator').style.color = '#aab4a8';
+      success = true;
+    } else alert('Неверный PIN бармена');
+  }
+
+  $('loginPin').value = '';
+  if (!success) return;
+  applyProfileTheme();
+  $('authModal').classList.remove('show');
+  if (currentDetailId) openRecipe(currentDetailId);
+  drawList();
+};
+
+function openAuthModal() {
+  $('authModal').classList.add('show');
+  updateStaffSelect();
+}
+$('openAuthBtn').onclick = openAuthModal;
+$('navAuth').onclick = openAuthModal;
+$('closeAuthBtn').onclick = () => $('authModal').classList.remove('show');
+
+// Настройки персонального профиля
+$('themeGrid').addEventListener('click', async e => {
+  const btn = e.target.closest('[data-theme-choice]');
+  if (!btn) return;
+  const theme = btn.dataset.themeChoice;
+  if (!['blue','orange','purple','green'].includes(theme)) return;
+
+  currentTheme = theme;
+  db.profiles = db.profiles || {};
+  db.profiles[getProfileKey()] = theme;
+  document.body.dataset.theme = theme;
+  renderSettings();
+  $('themeStatus').textContent = 'Сохранение оформления...';
+
+  const saved = await saveToCloud();
+  $('themeStatus').textContent = saved ? 'Цвет оформления сохранён.' : 'Не удалось сохранить. Проверьте подключение.';
+});
+
+// Отрисовка каталога и карточек
+function fmt(v) { return v === null || v === undefined || v === '' ? '—' : String(v).replace('.', ','); }
+function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function getCats() { return ['Все', ...new Set(db.recipes.map(r => r.category))]; }
+
+function filtered() {
+  return db.recipes.filter(r =>
+    (active === 'Все' || r.category === active) &&
+    (!query || [r.name, r.category, r.note, ...(r.ingredients || []).map(i => i.name)].join(' ').toLowerCase().includes(query.toLowerCase()))
+  );
+}
+
+function drawFilters() {
+  const cats = getCats();
+  if (!cats.includes(active)) active = 'Все';
+  $('filters').innerHTML = cats.map(c => `<button class="chip ${c === active ? 'active' : ''}" data-cat="${esc(c)}">${esc(c)}</button>`).join('');
+  document.querySelectorAll('[data-cat]').forEach(b => b.onclick = () => { active = b.dataset.cat; drawFilters(); drawList(); });
+}
+
+function drawList() {
+  const arr = filtered();
+  $('count').textContent = arr.length + ' поз.';
+  $('listTitle').textContent = query ? 'Результаты поиска' : active === 'Все' ? 'Все напитки' : active;
+  $('list').innerHTML = arr.length ? arr.map(r => `
+    <button class="recipe" data-id="${esc(r.id)}">
+      <div class="monogram">${esc(String(r.name || '').trim().slice(0,1).toUpperCase())}</div>
+      <div class="recipe-main"><div class="recipe-name">${esc(r.name)}</div><div class="recipe-meta">${esc(r.category)} · ${(r.ingredients || []).length} ингр.</div></div>
+      <div class="arrow">›</div>
+    </button>
+  `).join('') : '<div class="empty">Ничего не найдено.<br><span class="tiny">Попробуйте изменить запрос или категорию.</span></div>';
+  document.querySelectorAll('[data-id]').forEach(b => b.onclick = () => openRecipe(b.dataset.id));
+}
+
+function openRecipe(id) {
+  const r = db.recipes.find(x => x.id === id);
+  if (!r) return;
+  currentDetailId = id;
+  $('settings').classList.remove('show');
+  $('catalog').classList.add('hide');
+  $('detail').classList.add('show');
+  window.scrollTo(0, 0);
+  let mult = 1;
+
+  const ingredientsHtml = () => (r.ingredients || []).map(i => `
+    <div class="ingredient"><span>${esc(i.name)}</span><span class="amount">${fmt(Number(i.amount) * mult)} <small class="tiny">мл/г</small></span></div>
+  `).join('');
+  const isMgr = currentUser.role === 'manager';
+
+  $('detailBody').innerHTML = `
+    <div class="hero"><div class="tag">${esc(r.category)} · ТЕХНОЛОГИЧЕСКАЯ КАРТА</div><h1>${esc(r.name)}</h1><p>Сотрудник на смене: ${esc(currentUser.name)}</p><div class="stats"><div class="stat">Выход: ${fmt(r.yield)} мл</div><div class="stat">Цена: ${r.price === null ? '—' : fmt(r.price)} ₽</div></div></div>
+    ${isMgr ? `<div class="manager-only" style="margin-bottom:12px;gap:8px;"><button class="btn btn-outline" id="editRecipeBtn" style="flex:1;">✎ Редактировать</button><button class="btn btn-danger" id="delRecipeBtn" style="flex:1;">✕ Удалить</button></div>` : ''}
+    <div class="panel"><h3>Состав</h3><div id="ings">${ingredientsHtml()}</div></div>
+    <div class="panel"><div class="yieldrow"><h3 style="margin:0">Пересчёт порций</h3><div class="calc"><span class="tiny">×</span><input id="mult" type="number" min="1" max="99" value="1"></div></div><div class="tiny" style="margin-top:8px">Количество каждого ингредиента пересчитывается автоматически.</div></div>
+    <div class="panel"><h3>Приготовление</h3>${r.preparation ? `<div class="step">${esc(r.preparation)}</div>` : '<div class="muted">Способ приготовления не указан.</div>'}</div>
+    <div class="panel"><h3>Подача и примечания</h3><div class="muted">Посуда: ${esc(r.vessel || '—')}<br>Примечание: ${esc(r.note || '—')}<br>Себестоимость: ${r.cost === null ? 'не указана' : fmt(r.cost)} ₽<br>Отпускная цена: ${r.price === null ? 'не указана' : fmt(r.price)} ₽</div></div>
+  `;
+
+  if (isMgr) {
+    $('editRecipeBtn').onclick = () => openModal(r);
+    $('delRecipeBtn').onclick = async () => {
+      if (!confirm(`Удалить техкарту "${r.name}"?`)) return;
+      db.recipes = db.recipes.filter(x => x.id !== id);
+      const saved = await saveToCloud();
+      if (!saved) alert('Не удалось подтвердить сохранение удаления в облаке. Проверьте базу перед повторной попыткой.');
+      $('back').click();
+      drawFilters();
+      drawList();
+    };
+  }
+
+  $('mult').oninput = e => {
+    const n = Math.max(1, Math.min(99, Number(e.target.value) || 1));
+    mult = n;
+    $('ings').innerHTML = ingredientsHtml();
+  };
+}
+
+// Форма добавления / редактирования
+const modal = $('recipeModal');
+const ingContainer = $('ingredientsContainer');
+
+function addIngRow(name = '', amount = '') {
+  const div = document.createElement('div');
+  div.className = 'ing-row';
+  div.innerHTML = `<input type="text" placeholder="Ингредиент" value="${esc(name)}" class="ing-name" required><input type="number" step="0.1" placeholder="Кол-во" value="${amount}" class="ing-amount" required><button type="button" class="btn btn-danger remove-ing" style="padding:10px 12px;font-size:11px;">✕</button>`;
+  ingContainer.appendChild(div);
+  div.querySelector('.remove-ing').onclick = () => {
+    if (ingContainer.children.length > 1) div.remove();
+    else alert('В рецепте должен быть хотя бы один ингредиент');
+  };
+}
+$('addIngBtn').onclick = () => addIngRow();
+
+function openModal(recipe = null) {
+  modal.classList.add('show');
+  ingContainer.innerHTML = '';
+  if (recipe) {
+    $('modalTitle').textContent = 'Редактировать техкарту';
+    $('editId').value = recipe.id;
+    $('fName').value = recipe.name;
+    $('fCategory').value = recipe.category;
+    $('fPrep').value = recipe.preparation || '';
+    $('fYield').value = recipe.yield || 250;
+    $('fPrice').value = recipe.price !== null ? recipe.price : '';
+    $('fVessel').value = recipe.vessel || '';
+    $('fCost').value = recipe.cost !== null ? recipe.cost : '';
+    $('fNote').value = recipe.note || '';
+    (recipe.ingredients || []).forEach(i => addIngRow(i.name, i.amount));
+  } else {
+    $('modalTitle').textContent = 'Новая техкарта';
+    $('editId').value = '';
+    $('recipeForm').reset();
+    addIngRow();
+  }
+}
+
+$('addBtn').onclick = () => openModal();
+$('closeModal').onclick = () => modal.classList.remove('show');
+
+$('recipeForm').onsubmit = async e => {
+  e.preventDefault();
+  const id = $('editId').value;
+  const ingredients = [];
+  document.querySelectorAll('.ing-row').forEach(row => {
+    const name = row.querySelector('.ing-name').value.trim();
+    const amount = parseFloat(row.querySelector('.ing-amount').value) || 0;
+    if (name) ingredients.push({ name, amount });
+  });
+  if (!ingredients.length) return alert('Добавьте хотя бы один ингредиент.');
+
+  const recipeData = {
+    id: id || 'r_' + Date.now(),
+    name: $('fName').value.trim(),
+    category: $('fCategory').value.trim() || 'Прочее',
+    ingredients,
+    preparation: $('fPrep').value.trim(),
+    yield: $('fYield').value ? parseFloat($('fYield').value) : 250,
+    price: $('fPrice').value !== '' ? parseFloat($('fPrice').value) : null,
+    vessel: $('fVessel').value.trim(),
+    cost: $('fCost').value !== '' ? parseFloat($('fCost').value) : null,
+    note: $('fNote').value.trim()
+  };
+
+  if (id) {
+    const idx = db.recipes.findIndex(x => x.id === id);
+    if (idx !== -1) db.recipes[idx] = recipeData;
+  } else db.recipes.unshift(recipeData);
+
+  const saved = await saveToCloud();
+  if (!saved) alert('Не удалось подтвердить сохранение в облаке. Проверьте подключение и базу.');
+  modal.classList.remove('show');
+  drawFilters();
+  drawList();
+  if ($('detail').classList.contains('show') && id) openRecipe(id);
+};
+
+// Навигация
+$('back').onclick = () => {
+  currentDetailId = null;
+  $('detail').classList.remove('show');
+  $('catalog').classList.remove('hide');
+  $('settings').classList.remove('show');
+};
+
+$('navHome').onclick = () => {
+  $('settings').classList.remove('show');
+  $('back').click();
+  document.querySelectorAll('.navitem').forEach(item => item.classList.remove('active'));
+  $('navHome').classList.add('active');
+  active = 'Все';
+  query = '';
+  $('q').value = '';
+  drawFilters();
+  drawList();
+};
+
+$('navSearch').onclick = () => {
+  $('settings').classList.remove('show');
+  $('back').click();
+  document.querySelectorAll('.navitem').forEach(item => item.classList.remove('active'));
+  $('navSearch').classList.add('active');
+  $('q').focus();
+};
+
+$('navSettings').onclick = () => {
+  $('catalog').classList.add('hide');
+  $('detail').classList.remove('show');
+  $('settings').classList.add('show');
+  document.querySelectorAll('.navitem').forEach(item => item.classList.remove('active'));
+  $('navSettings').classList.add('active');
+  renderSettings();
+};
+
+$('q').addEventListener('input', e => { query = e.target.value; drawList(); });
+
+// Pull to Refresh: жест доступен только от верхней границы страницы
+let pullStartY = 0;
+let pullDistance = 0;
+let isPulling = false;
+let isRefreshing = false;
+const pullIndicator = $('pullIndicator');
+const pullText = $('pullText');
+
+function resetPull() {
+  pullStartY = 0;
+  pullDistance = 0;
+  isPulling = false;
+  if (!isRefreshing) {
+    pullIndicator.style.top = '-60px';
+    pullIndicator.classList.remove('loading');
+  }
+}
+
+async function refreshApp() {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  pullIndicator.classList.add('loading');
+  pullIndicator.style.top = 'calc(env(safe-area-inset-top) + 12px)';
+  pullText.textContent = 'Обновление...';
+
+  const ok = await loadFromCloud();
+  if (ok && currentDetailId && db.recipes.some(r => r.id === currentDetailId)) {
+    openRecipe(currentDetailId);
+  }
+  pullText.textContent = ok ? 'Обновлено' : 'Ошибка обновления';
+
+  window.setTimeout(() => {
+    isRefreshing = false;
+    pullIndicator.classList.remove('loading');
+    pullIndicator.style.top = '-60px';
+    pullStartY = 0;
+    pullDistance = 0;
+    isPulling = false;
+  }, 700);
+}
+
+document.addEventListener('touchstart', e => {
+  if (isRefreshing || e.touches.length !== 1 || window.scrollY > 0) return;
+  pullStartY = e.touches[0].clientY;
+  pullDistance = 0;
+  isPulling = false;
+}, { passive: true });
+
+document.addEventListener('touchmove', e => {
+  if (!pullStartY || isRefreshing || e.touches.length !== 1) return;
+  const distance = e.touches[0].clientY - pullStartY;
+  if (window.scrollY > 0 || distance <= 0) return;
+  pullDistance = distance;
+  if (distance > 8) {
+    isPulling = true;
+    e.preventDefault();
+    pullIndicator.style.top = `${Math.min(distance, 90) - 58}px`;
+    pullText.textContent = distance >= 75 ? 'Отпустите для обновления' : 'Потяните для обновления';
+  }
+}, { passive: false });
+
+document.addEventListener('touchend', () => {
+  if (!isPulling || isRefreshing) {
+    resetPull();
+    return;
+  }
+  if (pullDistance >= 75) refreshApp();
+  else resetPull();
+});
+
+document.addEventListener('touchcancel', resetPull);
+
+// Инициализация при старте
+loadFromCloud();
+drawFilters();
+drawList();
+applyProfileTheme();
+</script>
+</body>
+</html>
