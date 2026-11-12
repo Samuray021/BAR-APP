@@ -3,12 +3,13 @@ import type { FormEvent } from 'react'
 import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import type { Recipe, Staff, Ingredient } from './types'
+import { OperationsPanel } from './OperationsPanel'
 
-type Tab = 'recipes' | 'prep' | 'writeoff' | 'shift' | 'team'
+type Tab = 'recipes' | 'prep' | 'writeoff' | 'shift' | 'team' | 'settings'
 const nav: { id: Tab; title: string; icon: string }[] = [
   { id: 'recipes', title: 'Техкарты', icon: '◈' }, { id: 'prep', title: 'Заготовки', icon: '◌' },
   { id: 'writeoff', title: 'Списание', icon: '−' }, { id: 'shift', title: 'Открытие смены', icon: '▤' },
-  { id: 'team', title: 'Команда', icon: '♙' },
+  { id: 'team', title: 'Команда', icon: '♙' }, { id: 'settings', title: 'Настройки', icon: '⚙' },
 ]
 type RecipeDraft = { name: string; category: string; ingredients: Ingredient[]; preparation: string; yield: number; vessel: string; cost: number; price: number; note: string }
 const blank = (): RecipeDraft => ({ name: '', category: 'Коктейли', ingredients: [{ name: '', amount: '', unit: 'мл' }], preparation: '', yield: 0, vessel: '', cost: 0, price: 0, note: '' })
@@ -32,7 +33,13 @@ export default function App() {
   const [draft, setDraft] = useState<RecipeDraft>(blank())
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [profile, setProfile] = useState<{theme:string;color_mode:string}>({theme:'green',color_mode:'dark'})
   const manager = staff?.role === 'manager'
+  const loadProfile = useCallback(async (staffId: string) => {
+    const { data } = await supabase.from('profiles').select('theme,color_mode').eq('staff_id', staffId).maybeSingle()
+    if (data) setProfile({ theme: data.theme || 'green', color_mode: data.color_mode || 'dark' })
+    else { const { data: created } = await supabase.from('profiles').upsert({staff_id:staffId}).select('theme,color_mode').single(); if (created) setProfile({theme:created.theme || 'green',color_mode:created.color_mode || 'dark'}) }
+  }, [])
 
   const loadStaff = useCallback(async (userId: string) => {
     const { data, error } = await supabase.from('staff').select('id,name,username,role,active,auth_user_id').eq('auth_user_id', userId).eq('active', true).maybeSingle()
@@ -64,7 +71,7 @@ export default function App() {
     })
     return () => { active = false; auth.subscription.unsubscribe() }
   }, [loadStaff])
-  useEffect(() => { if (session && staff) void loadRecipes() }, [session, staff, loadRecipes])
+  useEffect(() => { if (session && staff) { void loadRecipes(); void loadProfile(staff.id) } }, [session, staff, loadRecipes, loadProfile])
 
   const categories = useMemo(() => ['Все', ...Array.from(new Set(recipes.map(r => r.category).filter(Boolean))).sort()], [recipes])
   const shown = useMemo(() => recipes.filter(r => (category === 'Все' || r.category === category) && [r.name, r.category, ...(r.ingredients ?? []).map(i => i.name)].join(' ').toLocaleLowerCase('ru').includes(query.toLocaleLowerCase('ru'))), [recipes, category, query])
@@ -112,7 +119,7 @@ export default function App() {
     <div className="login-foot">ДОСТУП ТОЛЬКО ДЛЯ СОТРУДНИКОВ</div>
   </div></main>
 
-  return <div className="app-shell">
+  return <div className={'app-shell theme-' + profile.color_mode + ' accent-' + profile.theme}>
     <header className="topbar"><div className="brand-lockup compact"><span className="brand-mark">B</span><div><strong>BAR APP</strong><small>OPERATIONS</small></div></div><div className="user-area"><div className="user-avatar">{staff.name.slice(0,1).toUpperCase()}</div><div className="user-meta"><b>{staff.name}</b><small>{manager ? 'Управляющий' : 'Сотрудник'}</small></div><button className="icon-btn" onClick={signOut} aria-label="Выйти">↗</button></div></header>
     <main className="workspace"><aside className="sidebar"><div className="side-label">РАЗДЕЛЫ</div>{nav.map(n => <button key={n.id} className={'nav-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span>{n.title}{n.id === 'recipes' && <small>{recipes.length}</small>}</button>)}<div className="sidebar-bottom"><span className="status-dot"/> База данных подключена</div></aside>
       <section className="content">{tab === 'recipes' ? <>
@@ -122,7 +129,7 @@ export default function App() {
         <div className="category-row">{categories.map(c => <button key={c} className={'category-chip ' + (category === c ? 'chosen' : '')} onClick={() => setCategory(c)}>{c}</button>)}</div>
         {message && <div className="notice">{message}<button onClick={() => setMessage('')}>×</button></div>}
         {loading ? <div className="empty-state">Загружаем техкарты…</div> : shown.length ? <div className="recipe-grid">{shown.map(r => <button className="recipe-card" key={r.id} onClick={() => setSelected(r)}><div className="recipe-card-top"><span className="recipe-category">{r.category}</span><span className="card-arrow">↗</span></div><h3>{r.name}</h3><p>{(r.ingredients ?? []).slice(0,3).map(i => i.name).join(' · ') || 'Состав не указан'}</p><div className="recipe-card-foot"><span>{r.yield ? 'Выход ' + r.yield + ' мл' : 'Технологическая карта'}</span><b>{r.price ? r.price + ' ₽' : 'Подробнее'}</b></div></button>)}</div> : <div className="empty-state"><b>Ничего не найдено</b><span>Измените запрос или категорию.</span></div>}
-      </> : <div className="coming-soon"><span className="eyebrow">BAR APP / WORKSPACE</span><h1>{nav.find(n => n.id === tab)?.title}</h1><p>Раздел будет подключён следующим этапом. Общая навигация и система прав уже подготовлены.</p><div className="coming-mark">{nav.find(n => n.id === tab)?.icon}</div></div>}</section>
+      </> : <OperationsPanel tab={tab} staff={staff} manager={manager} profile={profile} onProfileChange={setProfile} onMessage={setMessage} />}</section>
     </main>
     <nav className="mobile-nav">{nav.map(n => <button key={n.id} className={'mobile-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span><small>{n.title === 'Открытие смены' ? 'Смена' : n.title}</small></button>)}</nav>
     {selected && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null) }}><section className="detail-panel"><button className="close-btn" onClick={() => setSelected(null)}>×</button><span className="eyebrow">{selected.category}</span><h2>{selected.name}</h2><div className="detail-metrics"><div><small>ВЫХОД</small><b>{selected.yield || '—'} {selected.yield ? 'мл' : ''}</b></div><div><small>ПОСУДА</small><b>{selected.vessel || '—'}</b></div><div><small>ЦЕНА</small><b>{selected.price ? selected.price + ' ₽' : '—'}</b></div></div><h3>Ингредиенты</h3><div className="ingredient-list">{(selected.ingredients ?? []).map((i, n) => <div key={n}><span>{i.name}</span><b>{i.amount}{i.unit ? ' ' + i.unit : ''}</b></div>)}</div><h3>Приготовление</h3><p className="preparation">{selected.preparation || 'Способ приготовления не указан.'}</p>{selected.note && <div className="note-box">{selected.note}</div>}{manager && <div className="detail-actions"><button className="subtle-btn" onClick={() => editRecipe(selected)}>Редактировать</button></div>}</section></div>}
