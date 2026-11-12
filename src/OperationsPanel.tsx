@@ -1,91 +1,115 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { FormEvent } from 'react'
 import type { Staff } from './types'
 import { supabase } from './lib/supabase'
 
-type Tab = 'prep' | 'writeoff' | 'shift' | 'team' | 'settings'
+type Tab = 'schedule' | 'team' | 'settings'
 type Profile = { theme: string; color_mode: string }
-type Props = { tab: Tab | 'recipes'; staff: Staff; manager: boolean; profile: Profile; onProfileChange: (p: Profile) => void; onMessage: (s: string) => void }
-type Prep = { id: string; name: string; category: string; ingredients: {name:string;amount:string|number;unit?:string}[]; preparation: string; yield_amount: number|null; yield_unit: string; shelf_life_hours: number|null; storage_conditions: string; note: string; active: boolean }
-type Batch = { id:string; prep_name:string; quantity:number; unit:string; produced_at:string; expires_at:string|null; note:string }
-type CheckItem = { id:string; title:string; description:string; sort_order:number }
-type Check = { id:string; checklist_item_id:string|null; title:string; completed:boolean; photo_path:string|null; comment:string }
+type Props = { tab: Tab; staff: Staff; manager: boolean; profile: Profile; onProfileChange: (p: Profile) => void; onMessage: (s: string) => void }
+type Shift = { id: string; staff_id: string; starts_at: string; ends_at: string; note: string; staff?: {name:string}|null }
+
+const pad=(n:number)=>String(n).padStart(2,'0')
+const dateKey=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
+const monday=(d:Date)=>{const x=new Date(d.getFullYear(),d.getMonth(),d.getDate());x.setDate(x.getDate()-((x.getDay()+6)%7));return x}
+const weekEnd=(d:Date)=>{const x=new Date(d);x.setDate(x.getDate()+7);return x}
+const monthStart=(d:Date)=>new Date(d.getFullYear(),d.getMonth(),1)
+const nextMonth=(d:Date)=>new Date(d.getFullYear(),d.getMonth()+1,1)
+const localDateTime=(date:string,time:string)=>{const [y,m,day]=date.split('-').map(Number);const [h,min]=time.split(':').map(Number);return new Date(y,m-1,day,h,min)}
+const hoursBetween=(a:string,b:string)=>Math.max(0,(new Date(b).getTime()-new Date(a).getTime())/3600000)
+const formatTime=(s:string)=>new Date(s).toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'})
+const formatDate=(s:string)=>new Date(s).toLocaleDateString('ru-RU',{weekday:'short',day:'numeric',month:'short'})
+const monthName=(d:Date)=>d.toLocaleDateString('ru-RU',{month:'long',year:'numeric'})
 
 export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMessage}:Props) {
- const [preps,setPreps]=useState<Prep[]>([])
- const [batches,setBatches]=useState<Batch[]>([])
  const [staffRows,setStaffRows]=useState<Staff[]>([])
- const [checks,setChecks]=useState<Check[]>([])
- const [items,setItems]=useState<CheckItem[]>([])
- const [sessionId,setSessionId]=useState<string|null>(null)
+ const [shifts,setShifts]=useState<Shift[]>([])
  const [busy,setBusy]=useState(false)
- const [name,setName]=useState('')
- const [category,setCategory]=useState('Заготовки')
- const [ingredients,setIngredients]=useState('')
- const [preparation,setPreparation]=useState('')
- const [yieldAmount,setYieldAmount]=useState('')
- const [yieldUnit,setYieldUnit]=useState('мл')
- const [shelfLife,setShelfLife]=useState('24')
- const [storage,setStorage]=useState('')
- const [batchQty,setBatchQty]=useState('')
- const [batchUnit,setBatchUnit]=useState('мл')
- const [selectedPrep,setSelectedPrep]=useState('')
- const [writeName,setWriteName]=useState('')
- const [writeQty,setWriteQty]=useState('')
- const [writeUnit,setWriteUnit]=useState('шт.')
- const [writeReason,setWriteReason]=useState('Бой')
- const [writeComment,setWriteComment]=useState('')
+ const [anchor,setAnchor]=useState(()=>new Date())
+ const [staffFilter,setStaffFilter]=useState('all')
+ const [shiftStaff,setShiftStaff]=useState('')
+ const [shiftDate,setShiftDate]=useState(dateKey(new Date()))
+ const [startTime,setStartTime]=useState('10:00')
+ const [endTime,setEndTime]=useState('22:00')
+ const [note,setNote]=useState('')
+ const [editingId,setEditingId]=useState<string|null>(null)
  const [employeeName,setEmployeeName]=useState('')
  const [employeeLogin,setEmployeeLogin]=useState('')
  const [employeePassword,setEmployeePassword]=useState('')
  const [employeeRole,setEmployeeRole]=useState<'bartender'|'manager'>('bartender')
- const [newCheck,setNewCheck]=useState('')
  const [localMessage,setLocalMessage]=useState('')
+ const [monthHours,setMonthHours]=useState(0)
 
  const report=(s:string)=>{setLocalMessage(s);onMessage(s)}
- const loadPrep=async()=>{const [{data:p,error:e1},{data:b,error:e2}]=await Promise.all([supabase.from('prep_recipes').select('*').eq('active',true).order('name'),supabase.from('prep_batches').select('*').order('produced_at',{ascending:false}).limit(100)]);if(e1||e2)report((e1||e2)!.message);else{setPreps((p||[]) as Prep[]);setBatches((b||[]) as Batch[])}}
+ const weekStart=useMemo(()=>monday(anchor),[anchor])
+ const weekFinish=useMemo(()=>weekEnd(weekStart),[weekStart])
+ const visibleShifts=useMemo(()=>shifts.filter(s=>staffFilter==='all'||s.staff_id===staffFilter),[shifts,staffFilter])
  const loadTeam=async()=>{const {data,error}=await supabase.from('staff').select('id,name,username,role,active,auth_user_id').order('name');if(error)report(error.message);else setStaffRows((data||[]) as Staff[])}
- const loadShift=async()=>{
-  const {data:s,error}=await supabase.from('shift_sessions').select('id').gte('opened_at',new Date(new Date().setHours(0,0,0,0)).toISOString()).order('opened_at',{ascending:false}).limit(1).maybeSingle()
+ const loadShifts=async()=>{
+  const from=weekStart.toISOString(),to=weekFinish.toISOString()
+  let q=supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff(name)').lt('starts_at',to).gt('ends_at',from).order('starts_at')
+  if(!manager)q=q.eq('staff_id',staff.id)
+  const {data,error}=await q
   if(error){report(error.message);return}
-  let id=s?.id as string|undefined
-  if(!id){const {data:created,error:ce}=await supabase.from('shift_sessions').insert({opened_by:staff.id}).select('id').single();if(ce){report(ce.message);return}id=created.id}
-  if(!id){report('Не удалось открыть смену');return}
-  setSessionId(id)
-  const [{data:i,error:ie},{data:c,error:ce}]=await Promise.all([supabase.from('shift_checklist_items').select('id,title,description,sort_order').eq('active',true).order('sort_order'),supabase.from('shift_checks').select('*').eq('shift_session_id',id)])
-  if(ie||ce){report((ie||ce)!.message);return}
-  setItems((i||[]) as CheckItem[])
-  const existing=(c||[]) as Check[]
-  const missing=(i||[]).filter((it:any)=>!existing.some(x=>x.checklist_item_id===it.id))
-  if(missing.length){const {error:insertError}=await supabase.from('shift_checks').insert(missing.map((it:any)=>({shift_session_id:id,checklist_item_id:it.id,title:it.title,completed_by:staff.id})));if(insertError){report(insertError.message);return}}
-  const {data:all}=await supabase.from('shift_checks').select('*').eq('shift_session_id',id).order('created_at')
-  setChecks((all||[]) as Check[])
+  setShifts((data||[]) as unknown as Shift[])
  }
- useEffect(()=>{if(tab==='prep')void loadPrep();if(tab==='team'&&manager)void loadTeam();if(tab==='shift')void loadShift()},[tab,manager])
- const savePrep=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);try{let parsed:any[]=[];if(ingredients.trim())parsed=ingredients.split('\n').map(line=>{const [n,a,u]=line.split('|');return{name:n?.trim()||'',amount:a?.trim()||'',unit:u?.trim()||''}}).filter(x=>x.name);const {error}=await supabase.from('prep_recipes').insert({name,category,ingredients:parsed,preparation,yield_amount:yieldAmount?Number(yieldAmount):null,yield_unit:yieldUnit,shelf_life_hours:shelfLife?Number(shelfLife):null,storage_conditions:storage,created_by:staff.id});if(error)throw error;setName('');setIngredients('');setPreparation('');setYieldAmount('');setStorage('');await loadPrep();report('Заготовка добавлена')}catch(e){report(e instanceof Error?e.message:'Ошибка сохранения')}finally{setBusy(false)}}
- const addBatch=async(e:React.FormEvent)=>{e.preventDefault();const p=preps.find(x=>x.id===selectedPrep);if(!p)return;setBusy(true);const expires=p.shelf_life_hours?new Date(Date.now()+p.shelf_life_hours*3600000).toISOString():null;const {error}=await supabase.from('prep_batches').insert({prep_recipe_id:p.id,prep_name:p.name,quantity:Number(batchQty),unit:batchUnit,expires_at:expires,staff_id:staff.id});setBusy(false);if(error)report(error.message);else{setBatchQty('');await loadPrep();report('Производство заготовки зарегистрировано')}}
- const addWriteoff=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);const {error}=await supabase.from('writeoffs').insert({item_name:writeName,quantity:Number(writeQty),unit:writeUnit,reason:writeReason,comment:writeComment,staff_id:staff.id});setBusy(false);if(error)report(error.message);else{setWriteName('');setWriteQty('');setWriteComment('');report('Списание сохранено')}}
- const createEmployee=async(e:React.FormEvent)=>{e.preventDefault();setBusy(true);const {data,error}=await supabase.functions.invoke('clever-processor',{body:{action:'create_staff',name:employeeName,username:employeeLogin,password:employeePassword,role:employeeRole}});setBusy(false);if(error||data?.error)report(error?.message||data.error);else{setEmployeeName('');setEmployeeLogin('');setEmployeePassword('');await loadTeam();report('Учётная запись создана')}}
+ const loadMonthHours=async()=>{
+  const from=monthStart(new Date()),to=nextMonth(new Date())
+  const {data,error}=await supabase.from('schedule_shifts').select('starts_at,ends_at').eq('staff_id',staff.id).lt('starts_at',to.toISOString()).gt('ends_at',from.toISOString())
+  if(error){report(error.message);return}
+  const total=(data||[]).reduce((sum,s)=>{
+   const a=Math.max(new Date(s.starts_at).getTime(),from.getTime())
+   const b=Math.min(new Date(s.ends_at).getTime(),to.getTime())
+   return sum+Math.max(0,b-a)/3600000
+  },0)
+  setMonthHours(total)
+ }
+ useEffect(()=>{if(tab==='team'&&manager)void loadTeam();if(tab==='schedule')void loadShifts();if(tab==='settings')void loadMonthHours()},[tab,manager,staff.id,weekStart.getTime()])
+ useEffect(()=>{if(manager&&staffRows.length&&!shiftStaff)setShiftStaff(staffRows.find(x=>x.active)?.id||'')},[manager,staffRows,shiftStaff])
+ const resetForm=()=>{setEditingId(null);setShiftDate(dateKey(new Date()));setStartTime('10:00');setEndTime('22:00');setNote('')}
+ const saveShift=async(e:FormEvent)=>{
+  e.preventDefault()
+  if(!shiftStaff){report('Выберите сотрудника');return}
+  const start=localDateTime(shiftDate,startTime)
+  let end=localDateTime(shiftDate,endTime)
+  if(end<=start)end=new Date(end.getTime()+86400000)
+  if((end.getTime()-start.getTime())>24*3600000){report('Смена не может длиться больше 24 часов');return}
+  setBusy(true)
+  const values={staff_id:shiftStaff,starts_at:start.toISOString(),ends_at:end.toISOString(),note:note.trim(),updated_at:new Date().toISOString()}
+  const result=editingId?await supabase.from('schedule_shifts').update(values).eq('id',editingId):await supabase.from('schedule_shifts').insert({...values,created_by:staff.id})
+  setBusy(false)
+  if(result.error){report(result.error.message);return}
+  resetForm();await loadShifts();await loadMonthHours();report(editingId?'Смена обновлена':'Смена добавлена')
+ }
+ const editShift=(s:Shift)=>{
+  const a=new Date(s.starts_at),b=new Date(s.ends_at)
+  setEditingId(s.id);setShiftStaff(s.staff_id);setShiftDate(dateKey(a));setStartTime(`${pad(a.getHours())}:${pad(a.getMinutes())}`);setEndTime(`${pad(b.getHours())}:${pad(b.getMinutes())}`);setNote(s.note||'')
+  window.scrollTo({top:0,behavior:'smooth'})
+ }
+ const deleteShift=async(id:string)=>{if(!window.confirm('Удалить эту смену?'))return;const {error}=await supabase.from('schedule_shifts').delete().eq('id',id);if(error)report(error.message);else{await loadShifts();await loadMonthHours();report('Смена удалена')}}
+ const createEmployee=async(e:FormEvent)=>{e.preventDefault();setBusy(true);const {data,error}=await supabase.functions.invoke('clever-processor',{body:{action:'create_staff',name:employeeName,username:employeeLogin,password:employeePassword,role:employeeRole}});setBusy(false);if(error||data?.error)report(error?.message||data.error);else{setEmployeeName('');setEmployeeLogin('');setEmployeePassword('');await loadTeam();report('Учётная запись создана')}}
  const toggleEmployee=async(row:Staff)=>{if(row.id===staff.id){report('Нельзя отключить собственную учётную запись');return}setBusy(true);const {data,error}=await supabase.functions.invoke('clever-processor',{body:{action:'update_staff',staff_id:row.id,active:!row.active}});setBusy(false);if(error||data?.error)report(error?.message||data.error);else{await loadTeam();report(row.active?'Доступ сотрудника отключён':'Доступ сотрудника восстановлен')}}
  const updateProfile=async(p:Profile)=>{onProfileChange(p);const {error}=await supabase.from('profiles').upsert({staff_id:staff.id,theme:p.theme,color_mode:p.color_mode,updated_at:new Date().toISOString()});if(error)report(error.message)}
- const toggleCheck=async(check:Check,done:boolean)=>{const {error}=await supabase.from('shift_checks').update({completed:done,completed_by:staff.id,completed_at:done?new Date().toISOString():null}).eq('id',check.id);if(error)report(error.message);else setChecks(old=>old.map(x=>x.id===check.id?{...x,completed:done}:x))}
- const uploadPhoto=async(check:Check,file:File)=>{if(!sessionId)return;const path=`${sessionId}/${check.id}-${Date.now()}.jpg`;const {error}=await supabase.storage.from('shift-photos').upload(path,file,{contentType:file.type,upsert:true});if(error){report(error.message);return}const {error:ue}=await supabase.from('shift_checks').update({photo_path:path,completed_by:staff.id}).eq('id',check.id);if(ue)report(ue.message);else{setChecks(old=>old.map(x=>x.id===check.id?{...x,photo_path:path}:x));report('Фото прикреплено')}}
- const addCheck=async(e:React.FormEvent)=>{e.preventDefault();const {error}=await supabase.from('shift_checklist_items').insert({title:newCheck,sort_order:items.length+1});if(error)report(error.message);else{setNewCheck('');await loadShift()}}
- const heading=({prep:'Заготовки',writeoff:'Списание',shift:'Открытие смены',team:'Команда',settings:'Настройки аккаунта'} as Record<string,string>)[tab]||''
- const description=({prep:'Рецептуры, производство и контроль сроков хранения',writeoff:'Регистрация потерь и журнал операций',shift:'Контроль готовности бара к началу работы',team:'Учётные записи и права доступа',settings:'Персональные параметры приложения'} as Record<string,string>)[tab]||''
+ const shiftTitle=(s:Shift)=>manager?(staffRows.find(x=>x.id===s.staff_id)?.name||s.staff?.name||'Сотрудник'):staff.name
+ const title=tab==='schedule'?'График':tab==='team'?'Команда':'Настройки аккаунта'
  return <div className="ops-page">
-  <div className="ops-head"><div><span className="eyebrow">BAR APP / WORKSPACE</span><h1>{heading}</h1><p>{description}</p></div></div>
+  <div className="ops-head"><div><span className="eyebrow">BAR APP / WORKSPACE</span><h1>{title}</h1><p>{tab==='schedule'?'Рабочие смены сотрудников':tab==='team'?'Учётные записи и права доступа':'Персональные параметры и статистика'}</p></div></div>
   {localMessage&&<div className="ops-alert">{localMessage}<button className="close-btn" style={{float:'right',position:'static'}} onClick={()=>setLocalMessage('')}>×</button></div>}
-  {tab==='prep'&&<><div className="ops-grid"><section className="ops-card"><h3>Новая заготовка</h3><form className="ops-form" onSubmit={savePrep}><label>Название<input required value={name} onChange={e=>setName(e.target.value)} placeholder="Например, сахарный сироп"/></label><label>Категория<input value={category} onChange={e=>setCategory(e.target.value)}/></label><label>Ингредиенты <span className="ops-muted">Одна строка: название | количество | единица</span><textarea value={ingredients} onChange={e=>setIngredients(e.target.value)} placeholder={'Сахар | 500 | г\nВода | 500 | мл'}/></label><label>Технология<textarea value={preparation} onChange={e=>setPreparation(e.target.value)}/></label><div className="ops-row"><label>Выход<input type="number" value={yieldAmount} onChange={e=>setYieldAmount(e.target.value)}/></label><label>Единица<input value={yieldUnit} onChange={e=>setYieldUnit(e.target.value)}/></label></div><label>Срок хранения, часов<input type="number" min="1" value={shelfLife} onChange={e=>setShelfLife(e.target.value)}/></label><label>Условия хранения<input value={storage} onChange={e=>setStorage(e.target.value)} placeholder="В холодильнике при +2…+6 °C"/></label><button className="primary-btn" disabled={busy}>Сохранить заготовку</button></form></section>
-  <section className="ops-card"><h3>Производство</h3><form className="ops-form" onSubmit={addBatch}><label>Заготовка<select required value={selectedPrep} onChange={e=>{setSelectedPrep(e.target.value);const p=preps.find(x=>x.id===e.target.value);if(p)setBatchUnit(p.yield_unit)}}><option value="">Выбрать заготовку</option>{preps.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select></label><div className="ops-row"><label>Количество<input required type="number" min="0.01" step="0.01" value={batchQty} onChange={e=>setBatchQty(e.target.value)}/></label><label>Единица<input value={batchUnit} onChange={e=>setBatchUnit(e.target.value)}/></label></div><button className="primary-btn" disabled={busy||!preps.length}>Зарегистрировать выпуск</button></form><h3>Последние партии</h3><div className="ops-list">{batches.map(b=><div className="ops-item" key={b.id}><div><b>{b.prep_name}</b><small>{b.quantity} {b.unit} · {new Date(b.produced_at).toLocaleString('ru-RU')} · {b.expires_at?'до '+new Date(b.expires_at).toLocaleString('ru-RU'):'срок не задан'}</small></div></div>)}{!batches.length&&<p>Пока нет зарегистрированных партий.</p>}</div></section></div><section className="ops-card" style={{marginTop:14}}><h3>Каталог заготовок</h3><div className="ops-list">{preps.map(p=><div className="ops-item" key={p.id}><div><b>{p.name}</b><small>{p.category} · Выход {p.yield_amount??'—'} {p.yield_unit} · Хранение {p.shelf_life_hours??'—'} ч</small>{p.preparation&&<small>{p.preparation}</small>}</div></div>)}{!preps.length&&<p>Заготовки ещё не добавлены.</p>}</div></section></>}
-  {tab==='writeoff'&&<><section className="ops-card"><h3>Новое списание</h3><form className="ops-form" onSubmit={addWriteoff}><label>Позиция<input required value={writeName} onChange={e=>setWriteName(e.target.value)} placeholder="Название продукта или напитка"/></label><div className="ops-row"><label>Количество<input required type="number" min="0.01" step="0.01" value={writeQty} onChange={e=>setWriteQty(e.target.value)}/></label><label>Единица<select value={writeUnit} onChange={e=>setWriteUnit(e.target.value)}>{['шт.','мл','л','г','кг','порция','бут.'].map(x=><option key={x}>{x}</option>)}</select></label></div><label>Причина<select value={writeReason} onChange={e=>setWriteReason(e.target.value)}>{['Бой','Порча','Истёк срок годности','Ошибка приготовления','Возврат гостя','Персонал','Инвентаризация','Другое'].map(x=><option key={x}>{x}</option>)}</select></label><label>Комментарий<textarea value={writeComment} onChange={e=>setWriteComment(e.target.value)} placeholder="Дополнительная информация"/></label><button className="primary-btn" disabled={busy}>Зафиксировать списание</button></form></section><section className="ops-card" style={{marginTop:14}}><h3>История списаний</h3><WriteoffHistory staff={staff} manager={manager}/></section></>}
-  {tab==='shift'&&<><section className="ops-card"><h3>Чек-лист открытия</h3><p>Отмечайте выполненные задачи. К каждой задаче можно прикрепить фотографию.</p>{checks.map(c=><div className="ops-check" key={c.id}><input type="checkbox" checked={c.completed} onChange={e=>void toggleCheck(c,e.target.checked)}/><div style={{flex:1}}><span>{c.title}</span>{c.photo_path&&<small>Фото прикреплено</small>}<label className="ops-photo">Прикрепить фото<input type="file" accept="image/*" capture="environment" onChange={e=>{const f=e.target.files?.[0];if(f)void uploadPhoto(c,f)}}/></label></div></div>)}<p>{checks.filter(c=>c.completed).length} из {checks.length} задач выполнено</p></section>{manager&&<section className="ops-card" style={{marginTop:14}}><h3>Добавить пункт чек-листа</h3><form className="ops-row" onSubmit={addCheck}><input required value={newCheck} onChange={e=>setNewCheck(e.target.value)} placeholder="Новый пункт"/><button className="primary-btn">Добавить</button></form></section>}</>}
+  {tab==='schedule'&&<>
+   {manager&&<section className="ops-card schedule-editor"><h3>{editingId?'Изменить смену':'Добавить рабочую смену'}</h3><form className="ops-form" onSubmit={saveShift}>
+    <div className="schedule-form-grid">
+     <label>Сотрудник<select required value={shiftStaff} onChange={e=>setShiftStaff(e.target.value)}><option value="">Выбрать сотрудника</option>{staffRows.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+     <label>Дата<input type="date" required value={shiftDate} onChange={e=>setShiftDate(e.target.value)}/></label>
+     <label>Начало<input type="time" required value={startTime} onChange={e=>setStartTime(e.target.value)}/></label>
+     <label>Окончание<input type="time" required value={endTime} onChange={e=>setEndTime(e.target.value)}/></label>
+    </div>
+    <label>Комментарий, необязательно<input value={note} onChange={e=>setNote(e.target.value)} placeholder="Например, вечерняя смена"/></label>
+    <div className="ops-row"><button className="primary-btn" disabled={busy||!shiftStaff}>{busy?'Сохраняю…':editingId?'Сохранить изменения':'Добавить смену'}</button>{editingId&&<button type="button" className="subtle-btn" onClick={resetForm}>Отмена</button>}</div>
+   </form></section>}
+   <div className="schedule-toolbar"><button className="subtle-btn" onClick={()=>setAnchor(new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate()-7))}>← Неделя</button><strong>{formatDate(weekStart.toISOString())} — {new Date(weekFinish.getTime()-86400000).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</strong><button className="subtle-btn" onClick={()=>setAnchor(new Date(anchor.getFullYear(),anchor.getMonth(),anchor.getDate()+7))}>Следующая →</button><button className="subtle-btn" onClick={()=>setAnchor(new Date())}>Сегодня</button></div>
+   {manager&&<div className="schedule-filter"><label>Сотрудник<select value={staffFilter} onChange={e=>setStaffFilter(e.target.value)}><option value="all">Вся команда</option>{staffRows.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label></div>}
+   <div className="schedule-week">{Array.from({length:7},(_,i)=>{const day=new Date(weekStart);day.setDate(day.getDate()+i);const key=dateKey(day);const list=visibleShifts.filter(s=>dateKey(new Date(s.starts_at))===key);return <section className="schedule-day" key={key}><div className="schedule-day-head"><b>{day.toLocaleDateString('ru-RU',{weekday:'long'})}</b><span>{day.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span></div>{list.length?list.map(s=><article className="schedule-shift" key={s.id}><div className="schedule-shift-time">{formatTime(s.starts_at)}–{formatTime(s.ends_at)}<small>{hoursBetween(s.starts_at,s.ends_at).toFixed(1)} ч</small></div><div className="schedule-shift-info"><b>{shiftTitle(s)}</b>{s.note&&<small>{s.note}</small>}</div>{manager&&<div className="schedule-actions"><button className="subtle-btn" onClick={()=>editShift(s)}>Изменить</button><button className="danger-btn" onClick={()=>void deleteShift(s.id)}>×</button></div>}</article>):<p className="schedule-empty">Смен нет</p>}</section>})}</div>
+  </>}
   {tab==='team'&&<>{manager?<><div className="ops-grid"><section className="ops-card"><h3>Новый сотрудник</h3><form className="ops-form" onSubmit={createEmployee}><label>Имя и фамилия<input required value={employeeName} onChange={e=>setEmployeeName(e.target.value)}/></label><label>Логин<input required minLength={3} pattern="[a-zA-Z0-9_]{3,30}" value={employeeLogin} onChange={e=>setEmployeeLogin(e.target.value)} placeholder="Например, ivan"/></label><label>Временный пароль<input required minLength={8} type="password" value={employeePassword} onChange={e=>setEmployeePassword(e.target.value)}/></label><label>Роль<select value={employeeRole} onChange={e=>setEmployeeRole(e.target.value as 'bartender'|'manager')}><option value="bartender">Сотрудник</option><option value="manager">Управляющий</option></select></label><button className="primary-btn" disabled={busy}>Создать учётную запись</button></form></section><section className="ops-card"><h3>Управление доступом</h3><p>Отключённые учётные записи не смогут войти в приложение.</p></section></div><section className="ops-card" style={{marginTop:14}}><h3>Сотрудники</h3><div className="ops-list">{staffRows.map(row=><div className="ops-item" key={row.id}><div><b>{row.name}</b><small>@{row.username||'—'} · {row.role==='manager'?'Управляющий':'Сотрудник'} · {row.active?'Активен':'Доступ отключён'}</small></div>{row.id!==staff.id&&<button className={row.active?'danger-btn':'subtle-btn'} disabled={busy} onClick={()=>void toggleEmployee(row)}>{row.active?'Отключить':'Восстановить'}</button>}</div>)}</div></section></>:<div className="ops-card"><h3>Доступ ограничен</h3><p>Управлять учётными записями может только управляющий.</p></div>}</>}
-  {tab==='settings'&&<section className="ops-card ops-settings"><h3>Оформление приложения</h3><p>Настройки сохраняются в профиле и применяются при следующем входе на любом устройстве.</p><b>Цвет акцента</b><div className="swatches">{[{id:'green',color:'#b5c79a'},{id:'blue',color:'#8fb8e8'},{id:'orange',color:'#e9ad78'},{id:'purple',color:'#c1a2e8'}].map(x=><button key={x.id} aria-label={x.id} className={'swatch '+(profile.theme===x.id?'selected':'')} style={{background:x.color}} onClick={()=>void updateProfile({...profile,theme:x.id})}/>)}</div><b>Тема</b><div className="mode-choice" style={{marginTop:12}}><button className={profile.color_mode==='dark'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'dark'})}>Тёмная</button><button className={profile.color_mode==='light'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'light'})}>Светлая</button></div><p className="ops-muted" style={{marginTop:18}}>Аккаунт: {staff.name} · {staff.role==='manager'?'Управляющий':'Сотрудник'}</p></section>}
+  {tab==='settings'&&<><section className="ops-card hours-card"><span className="ops-muted">{monthName(new Date())}</span><div className="hours-value">{monthHours.toFixed(1)} <small>ч</small></div><b>Часы по графику за месяц</b><p>Сумма длительности назначенных смен, включая смены, переходящие через полночь. Это плановое время по графику, а не отметки фактического прихода и ухода.</p></section><section className="ops-card ops-settings" style={{marginTop:14}}><h3>Оформление приложения</h3><p>Настройки сохраняются в профиле и применяются при следующем входе на любом устройстве.</p><b>Цвет акцента</b><div className="swatches">{[{id:'green',color:'#b5c79a'},{id:'blue',color:'#8fb8e8'},{id:'orange',color:'#e9ad78'},{id:'purple',color:'#c1a2e8'}].map(x=><button key={x.id} aria-label={x.id} className={'swatch '+(profile.theme===x.id?'selected':'')} style={{background:x.color}} onClick={()=>void updateProfile({...profile,theme:x.id})}/>)}</div><b>Тема</b><div className="mode-choice" style={{marginTop:12}}><button className={profile.color_mode==='dark'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'dark'})}>Тёмная</button><button className={profile.color_mode==='light'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'light'})}>Светлая</button></div><p className="ops-muted" style={{marginTop:18}}>Аккаунт: {staff.name} · {staff.role==='manager'?'Управляющий':'Сотрудник'}</p></section></>}
  </div>
-}
-
-function WriteoffHistory({staff,manager}:{staff:Staff;manager:boolean}) {
- const [rows,setRows]=useState<any[]>([])
- useEffect(()=>{let q=supabase.from('writeoffs').select('id,item_name,quantity,unit,reason,comment,occurred_at,staff(name)').order('occurred_at',{ascending:false}).limit(100);if(!manager)q=q.eq('staff_id',staff.id);void q.then(({data})=>setRows(data||[]))},[staff.id,manager])
- return <div className="ops-list">{rows.map(r=><div className="ops-item" key={r.id}><div><b>{r.item_name} — {r.quantity} {r.unit}</b><small>{r.reason} · {new Date(r.occurred_at).toLocaleString('ru-RU')} · {r.staff?.name||'Сотрудник'}</small>{r.comment&&<small>{r.comment}</small>}</div></div>)}{!rows.length&&<p>Списаний пока нет.</p>}</div>
 }
