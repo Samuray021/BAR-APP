@@ -11,8 +11,9 @@ export interface Staff {
 
 export interface Ingredient {
   name: string
-  amount: string
-  unit: string
+  amount: string | number
+  unit?: string
+  source_row?: number
 }
 
 export interface Recipe {
