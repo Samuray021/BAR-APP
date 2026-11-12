@@ -8,6 +8,7 @@ type Tab = 'schedule' | 'team' | 'settings'
 type Profile = { theme: string; color_mode: string }
 type Props = { tab: Tab; staff: Staff; manager: boolean; profile: Profile; onProfileChange: (p: Profile) => void; onMessage: (s: string) => void }
 type Shift = { id: string; staff_id: string; starts_at: string; ends_at: string; note: string; staff?: {name:string}|null }
+type StaffDirectoryEntry = { id: string; name: string }
 
 const pad=(n:number)=>String(n).padStart(2,'0')
 const dateKey=(d:Date)=>`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`
@@ -23,6 +24,7 @@ const monthName=(d:Date)=>d.toLocaleDateString('ru-RU',{month:'long',year:'numer
 
 export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMessage}:Props) {
  const [staffRows,setStaffRows]=useState<Staff[]>([])
+ const [staffDirectory,setStaffDirectory]=useState<StaffDirectoryEntry[]>([])
  const [shifts,setShifts]=useState<Shift[]>([])
  const [busy,setBusy]=useState(false)
  const [anchor,setAnchor]=useState(()=>new Date())
@@ -30,7 +32,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  const [shiftStaff,setShiftStaff]=useState('')
  const [shiftDate,setShiftDate]=useState(dateKey(new Date()))
  const [startTime,setStartTime]=useState('10:00')
- const [endTime,setEndTime]=useState('22:00')
+ const [durationHours,setDurationHours]=useState('12')
  const [note,setNote]=useState('')
  const [editingId,setEditingId]=useState<string|null>(null)
  const [employeeName,setEmployeeName]=useState('')
@@ -48,11 +50,14 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  const loadTeam=async()=>{const {data,error}=await supabase.from('staff').select('id,name,username,role,active,auth_user_id').order('name');if(error)report(error.message);else setStaffRows((data||[]) as Staff[])}
  const loadShifts=async()=>{
   const from=weekStart.toISOString(),to=weekFinish.toISOString()
-  let q=supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff:staff!schedule_shifts_staff_id_fkey(name)').lt('starts_at',to).gt('ends_at',from).order('starts_at')
-  if(!manager)q=q.eq('staff_id',staff.id)
-  const {data,error}=await q
+  const {data,error}=await supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note').lt('starts_at',to).gt('ends_at',from).order('starts_at')
   if(error){report(error.message);return}
-  setShifts((data||[]) as unknown as Shift[])
+  const {data:directory,error:directoryError}=await supabase.from('staff_directory').select('id,name')
+  if(directoryError){report(directoryError.message);return}
+  const people=(directory||[]) as StaffDirectoryEntry[]
+  setStaffDirectory(people)
+  const names=new Map(people.map(person=>[person.id,person.name]))
+  setShifts((data||[]).map(s=>({...s,staff:{name:names.get(s.staff_id)||'Сотрудник'}})) as Shift[])
  }
  const loadMonthHours=async()=>{
   const from=monthStart(new Date()),to=nextMonth(new Date())
@@ -67,14 +72,14 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  }
  useEffect(()=>{if((tab==='team'||tab==='schedule')&&manager)void loadTeam();if(tab==='schedule')void loadShifts();if(tab==='settings')void loadMonthHours()},[tab,manager,staff.id,weekStart.getTime()])
  useEffect(()=>{if(manager&&staffRows.length&&!shiftStaff)setShiftStaff(staffRows.find(x=>x.active)?.id||'')},[manager,staffRows,shiftStaff])
- const resetForm=()=>{setEditingId(null);setShiftDate(dateKey(new Date()));setStartTime('10:00');setEndTime('22:00');setNote('')}
+ const resetForm=()=>{setEditingId(null);setShiftDate(dateKey(new Date()));setStartTime('10:00');setDurationHours('12');setNote('')}
  const saveShift=async(e:FormEvent)=>{
   e.preventDefault()
   if(!shiftStaff){report('Выберите сотрудника');return}
   const start=localDateTime(shiftDate,startTime)
-  let end=localDateTime(shiftDate,endTime)
-  if(end<=start)end=new Date(end.getTime()+86400000)
-  if((end.getTime()-start.getTime())>24*3600000){report('Смена не может длиться больше 24 часов');return}
+  const duration=Number(durationHours)
+  if(!Number.isFinite(duration)||duration<=0||duration>24){report('Укажите продолжительность смены от 0,5 до 24 часов');return}
+  const end=new Date(start.getTime()+duration*3600000)
   setBusy(true)
   const values={staff_id:shiftStaff,starts_at:start.toISOString(),ends_at:end.toISOString(),note:note.trim(),updated_at:new Date().toISOString()}
   const result=editingId?await supabase.from('schedule_shifts').update(values).eq('id',editingId):await supabase.from('schedule_shifts').insert({...values,created_by:staff.id})
@@ -83,8 +88,8 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   resetForm();await loadShifts();await loadMonthHours();report(editingId?'Смена обновлена':'Смена добавлена')
  }
  const editShift=(s:Shift)=>{
-  const a=new Date(s.starts_at),b=new Date(s.ends_at)
-  setEditingId(s.id);setShiftStaff(s.staff_id);setShiftDate(dateKey(a));setStartTime(`${pad(a.getHours())}:${pad(a.getMinutes())}`);setEndTime(`${pad(b.getHours())}:${pad(b.getMinutes())}`);setNote(s.note||'')
+  const a=new Date(s.starts_at)
+  setEditingId(s.id);setShiftStaff(s.staff_id);setShiftDate(dateKey(a));setStartTime(`${pad(a.getHours())}:${pad(a.getMinutes())}`);setDurationHours(hoursBetween(s.starts_at,s.ends_at).toString());setNote(s.note||'')
   window.scrollTo({top:0,behavior:'smooth'})
  }
  const deleteShift=async(id:string)=>{if(!window.confirm('Удалить эту смену?'))return;const {error}=await supabase.from('schedule_shifts').delete().eq('id',id);if(error)report(error.message);else{await loadShifts();await loadMonthHours();report('Смена удалена')}}
@@ -134,19 +139,13 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
     return monthBuckets.get(key)!
    }
    const addShiftToDays=(shift:any)=>{
-    let cursor=new Date(shift.starts_at)
+    const start=new Date(shift.starts_at)
     const finish=new Date(shift.ends_at)
-    if(!Number.isFinite(cursor.getTime())||!Number.isFinite(finish.getTime())||finish<=cursor)return
-    while(cursor<finish){
-     const year=cursor.getFullYear(),month=cursor.getMonth(),day=cursor.getDate()
-     const nextDay=new Date(year,month,day+1)
-     const segmentEnd=new Date(Math.min(finish.getTime(),nextDay.getTime()))
-     const hours=(segmentEnd.getTime()-cursor.getTime())/3600000
-     const bucket=ensureMonth(year,month)
-     if(!bucket.has(shift.staff_id))bucket.set(shift.staff_id,Array(31).fill(0))
-     bucket.get(shift.staff_id)![day-1]+=hours
-     cursor=segmentEnd
-    }
+    if(!Number.isFinite(start.getTime())||!Number.isFinite(finish.getTime())||finish<=start)return
+    const year=start.getFullYear(),month=start.getMonth(),day=start.getDate()
+    const bucket=ensureMonth(year,month)
+    if(!bucket.has(shift.staff_id))bucket.set(shift.staff_id,Array(31).fill(0))
+    bucket.get(shift.staff_id)![day-1]+=hoursBetween(shift.starts_at,shift.ends_at)
    }
    shifts.forEach(addShiftToDays)
    if(monthBuckets.size===0){
@@ -265,7 +264,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   }catch(e){report(e instanceof Error?'Не удалось выгрузить барную карту: '+e.message:'Не удалось выгрузить барную карту')}
   finally{setExporting(null)}
  }
- const shiftTitle=(s:Shift)=>manager?(staffRows.find(x=>x.id===s.staff_id)?.name||s.staff?.name||'Сотрудник'):staff.name
+ const shiftTitle=(s:Shift)=>staffDirectory.find(x=>x.id===s.staff_id)?.name||staffRows.find(x=>x.id===s.staff_id)?.name||s.staff?.name||'Сотрудник'
  const title=tab==='schedule'?'График':tab==='team'?'Команда':'Настройки аккаунта'
  return <div className="ops-page">
   <div className="ops-head"><div><span className="eyebrow">BAR APP / WORKSPACE</span><h1>{title}</h1><p>{tab==='schedule'?'Рабочие смены сотрудников':tab==='team'?'Учётные записи и права доступа':'Персональные параметры и статистика'}</p></div></div>
@@ -275,8 +274,8 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
     <div className="schedule-form-grid">
      <label>Сотрудник<select required value={shiftStaff} onChange={e=>setShiftStaff(e.target.value)}><option value="">Выбрать сотрудника</option>{staffRows.filter(x=>x.active).map(x=><option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
      <label>Дата<input type="date" required value={shiftDate} onChange={e=>setShiftDate(e.target.value)}/></label>
-     <label>Начало<input type="time" required value={startTime} onChange={e=>setStartTime(e.target.value)}/></label>
-     <label>Окончание<input type="time" required value={endTime} onChange={e=>setEndTime(e.target.value)}/></label>
+     <label>Время начала<input type="time" required value={startTime} onChange={e=>setStartTime(e.target.value)}/></label>
+     <label>Количество часов<input type="number" required min="0.5" max="24" step="0.5" value={durationHours} onChange={e=>setDurationHours(e.target.value)}/></label>
     </div>
     <label>Комментарий, необязательно<input value={note} onChange={e=>setNote(e.target.value)} placeholder="Например, вечерняя смена"/></label>
     <div className="ops-row"><button className="primary-btn" disabled={busy||!shiftStaff}>{busy?'Сохраняю…':editingId?'Сохранить изменения':'Добавить смену'}</button>{editingId&&<button type="button" className="subtle-btn" onClick={resetForm}>Отмена</button>}</div>
