@@ -5,11 +5,12 @@ import { supabase } from './lib/supabase'
 import type { Recipe, Staff, Ingredient } from './types'
 import { OperationsPanel } from './OperationsPanel'
 
-type Tab = 'recipes' | 'prep' | 'writeoff' | 'shift' | 'team' | 'settings'
+type Tab = 'recipes' | 'schedule' | 'team' | 'settings'
 const nav: { id: Tab; title: string; icon: string }[] = [
-  { id: 'recipes', title: 'Техкарты', icon: '◈' }, { id: 'prep', title: 'Заготовки', icon: '◌' },
-  { id: 'writeoff', title: 'Списание', icon: '−' }, { id: 'shift', title: 'Открытие смены', icon: '▤' },
-  { id: 'team', title: 'Команда', icon: '♙' }, { id: 'settings', title: 'Настройки', icon: '⚙' },
+  { id: 'recipes', title: 'Техкарты', icon: '◈' },
+  { id: 'schedule', title: 'График', icon: '▦' },
+  { id: 'team', title: 'Команда', icon: '♙' },
+  { id: 'settings', title: 'Настройки', icon: '⚙' },
 ]
 type RecipeDraft = { name: string; category: string; ingredients: Ingredient[]; preparation: string; yield: number; vessel: string; cost: number; price: number; note: string }
 const blank = (): RecipeDraft => ({ name: '', category: 'Коктейли', ingredients: [{ name: '', amount: '', unit: 'мл' }], preparation: '', yield: 0, vessel: '', cost: 0, price: 0, note: '' })
@@ -131,7 +132,7 @@ export default function App() {
         {loading ? <div className="empty-state">Загружаем техкарты…</div> : shown.length ? <div className="recipe-grid">{shown.map(r => <button className="recipe-card" key={r.id} onClick={() => setSelected(r)}><div className="recipe-card-top"><span className="recipe-category">{r.category}</span><span className="card-arrow">↗</span></div><h3>{r.name}</h3><p>{(r.ingredients ?? []).slice(0,3).map(i => i.name).join(' · ') || 'Состав не указан'}</p><div className="recipe-card-foot"><span>{r.yield ? 'Выход ' + r.yield + ' мл' : 'Технологическая карта'}</span><b>{r.price ? r.price + ' ₽' : 'Подробнее'}</b></div></button>)}</div> : <div className="empty-state"><b>Ничего не найдено</b><span>Измените запрос или категорию.</span></div>}
       </> : <OperationsPanel tab={tab} staff={staff} manager={manager} profile={profile} onProfileChange={setProfile} onMessage={setMessage} />}</section>
     </main>
-    <nav className="mobile-nav">{nav.map(n => <button key={n.id} className={'mobile-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span><small>{n.title === 'Открытие смены' ? 'Смена' : n.title}</small></button>)}</nav>
+    <nav className="mobile-nav">{nav.map(n => <button key={n.id} className={'mobile-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span><small>{n.title}</small></button>)}</nav>
     {selected && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null) }}><section className="detail-panel"><button className="close-btn" onClick={() => setSelected(null)}>×</button><span className="eyebrow">{selected.category}</span><h2>{selected.name}</h2><div className="detail-metrics"><div><small>ВЫХОД</small><b>{selected.yield || '—'} {selected.yield ? 'мл' : ''}</b></div><div><small>ПОСУДА</small><b>{selected.vessel || '—'}</b></div><div><small>ЦЕНА</small><b>{selected.price ? selected.price + ' ₽' : '—'}</b></div></div><h3>Ингредиенты</h3><div className="ingredient-list">{(selected.ingredients ?? []).map((i, n) => <div key={n}><span>{i.name}</span><b>{i.amount}{i.unit ? ' ' + i.unit : ''}</b></div>)}</div><h3>Приготовление</h3><p className="preparation">{selected.preparation || 'Способ приготовления не указан.'}</p>{selected.note && <div className="note-box">{selected.note}</div>}{manager && <div className="detail-actions"><button className="subtle-btn" onClick={() => editRecipe(selected)}>Редактировать</button></div>}</section></div>}
     {editorOpen && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setEditorOpen(false) }}><form className="editor-panel" onSubmit={saveRecipe}><button type="button" className="close-btn" onClick={() => setEditorOpen(false)}>×</button><span className="eyebrow">УПРАВЛЕНИЕ РЕЦЕПТУРОЙ</span><h2>{editing ? 'Редактировать техкарту' : 'Новая техкарта'}</h2>
       <label>Название<input required value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})}/></label><label>Категория<input required value={draft.category} onChange={e => setDraft({...draft,category:e.target.value})}/></label><div className="editor-label">Ингредиенты</div>
