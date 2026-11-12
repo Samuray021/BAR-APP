@@ -63,7 +63,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   },0)
   setMonthHours(total)
  }
- useEffect(()=>{if(tab==='team'&&manager)void loadTeam();if(tab==='schedule')void loadShifts();if(tab==='settings')void loadMonthHours()},[tab,manager,staff.id,weekStart.getTime()])
+ useEffect(()=>{if((tab==='team'||tab==='schedule')&&manager)void loadTeam();if(tab==='schedule')void loadShifts();if(tab==='settings')void loadMonthHours()},[tab,manager,staff.id,weekStart.getTime()])
  useEffect(()=>{if(manager&&staffRows.length&&!shiftStaff)setShiftStaff(staffRows.find(x=>x.active)?.id||'')},[manager,staffRows,shiftStaff])
  const resetForm=()=>{setEditingId(null);setShiftDate(dateKey(new Date()));setStartTime('10:00');setEndTime('22:00');setNote('')}
  const saveShift=async(e:FormEvent)=>{
