@@ -184,7 +184,6 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
      sheet.addRow(row)
     })
     sheet.views=[{state:'frozen',xSplit:1,ySplit:1}]
-    sheet.autoFilter={from:{row:1,column:1},to:{row:1,column:33}}
     const header=sheet.getRow(1)
     header.height=30
     header.eachCell(cell=>{
