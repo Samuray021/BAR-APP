@@ -31,15 +31,37 @@ document.addEventListener('click', function(event) {
   if (loginButton) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    if (typeof window.login === 'function') {
-      window.login();
-    } else {
-      const error = document.getElementById('loginError');
-      if (error) {
-        error.textContent = 'Скрипт приложения не запустился. Обновите страницу; если ошибка повторится, потребуется проверить JavaScript в браузере.';
-        error.style.display = 'block';
-      }
+    const username = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
+    const password = document.getElementById('loginPassword')?.value || '';
+    const error = document.getElementById('loginError');
+    const button = document.getElementById('loginBtn');
+    const showLoginError = message => {
+      if (error) { error.textContent = message; error.style.display = 'block'; }
+    };
+    if (!username || !password) {
+      showLoginError('Введите логин и пароль.');
+      return;
     }
+    if (!window.supabase?.createClient) {
+      showLoginError('Не загрузилась библиотека авторизации Supabase. Проверьте подключение и обновите страницу.');
+      return;
+    }
+    button.disabled = true;
+    button.textContent = 'Вход...';
+    window.supabase.createClient(
+      'https://izfmjvskitjnoydswfrj.supabase.co',
+      'sb_publishable_fE1vtnBdAun66t-Ph8_TGw_PyTFICvb',
+      {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
+    ).auth.signInWithPassword({email: username + '@barapp.invalid', password})
+      .then(({error: authError}) => {
+        if (authError) throw authError;
+        window.location.reload();
+      })
+      .catch(authError => showLoginError(authError?.message || 'Не удалось выполнить вход.'))
+      .finally(() => {
+        button.disabled = false;
+        button.textContent = 'Войти';
+      });
   }
 }, true);
 </script>
