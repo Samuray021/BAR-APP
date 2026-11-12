@@ -25,43 +25,6 @@ document.addEventListener('click', function(event) {
     event.stopImmediatePropagation();
     const modal = document.getElementById('authModal');
     if (modal) modal.classList.remove('show');
-    return;
-  }
-  const loginButton = event.target.closest('#loginBtn');
-  if (loginButton) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
-    const username = (document.getElementById('loginUsername')?.value || '').trim().toLowerCase();
-    const password = document.getElementById('loginPassword')?.value || '';
-    const error = document.getElementById('loginError');
-    const button = document.getElementById('loginBtn');
-    const showLoginError = message => {
-      if (error) { error.textContent = message; error.style.display = 'block'; }
-    };
-    if (!username || !password) {
-      showLoginError('Введите логин и пароль.');
-      return;
-    }
-    if (!window.supabase?.createClient) {
-      showLoginError('Не загрузилась библиотека авторизации Supabase. Проверьте подключение и обновите страницу.');
-      return;
-    }
-    button.disabled = true;
-    button.textContent = 'Вход...';
-    window.supabase.createClient(
-      'https://izfmjvskitjnoydswfrj.supabase.co',
-      'sb_publishable_fE1vtnBdAun66t-Ph8_TGw_PyTFICvb',
-      {auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}
-    ).auth.signInWithPassword({email: username + '@barapp.invalid', password})
-      .then(({error: authError}) => {
-        if (authError) throw authError;
-        window.location.reload();
-      })
-      .catch(authError => showLoginError(authError?.message || 'Не удалось выполнить вход.'))
-      .finally(() => {
-        button.disabled = false;
-        button.textContent = 'Войти';
-      });
   }
 }, true);
 </script>
@@ -101,7 +64,7 @@ function openRecipe(id){const r=db.recipes.find(x=>x.id===id);if(!r)return;curre
 const modal=$('recipeModal'),ingContainer=$('ingredientsContainer');function addIngRow(name='',amount=''){const div=document.createElement('div');div.className='ing-row';div.innerHTML=`<input type="text" placeholder="Ингредиент" value="${esc(name)}" class="ing-name" required><input type="number" step="0.1" placeholder="Кол-во" value="${esc(amount)}" class="ing-amount" required><button type="button" class="btn btn-danger remove-ing" style="padding:10px 12px;font-size:11px">✕</button>`;ingContainer.appendChild(div);div.querySelector('.remove-ing').onclick=()=>{if(ingContainer.children.length>1)div.remove();else alert('В рецепте должен быть хотя бы один ингредиент')}}$('addIngBtn').onclick=()=>addIngRow();function openModal(recipe=null){if(currentStaff?.role!=='manager')return alert('Недостаточно прав.');modal.classList.add('show');ingContainer.innerHTML='';if(recipe){$('modalTitle').textContent='Редактировать техкарту';$('editId').value=recipe.id;$('fName').value=recipe.name;$('fCategory').value=recipe.category;$('fPrep').value=recipe.preparation||'';$('fYield').value=recipe.yield??250;$('fPrice').value=recipe.price??'';$('fVessel').value=recipe.vessel||'';$('fCost').value=recipe.cost??'';$('fNote').value=recipe.note||'';(recipe.ingredients||[]).forEach(i=>addIngRow(i.name,i.amount))}else{$('modalTitle').textContent='Новая техкарта';$('editId').value='';$('recipeForm').reset();addIngRow()}}
 $('recipeForm').onsubmit=async e=>{e.preventDefault();if(currentStaff?.role!=='manager')return alert('Недостаточно прав.');const id=$('editId').value,ingredients=[];document.querySelectorAll('.ing-row').forEach(row=>{const name=row.querySelector('.ing-name').value.trim(),amount=parseFloat(row.querySelector('.ing-amount').value)||0;if(name)ingredients.push({name,amount})});if(!ingredients.length)return alert('Добавьте хотя бы один ингредиент.');const recipeData={id:id||'r_'+crypto.randomUUID(),name:$('fName').value.trim(),category:$('fCategory').value.trim()||'Прочее',ingredients,preparation:$('fPrep').value.trim(),yield:$('fYield').value?parseFloat($('fYield').value):250,price:$('fPrice').value!==''?parseFloat($('fPrice').value):null,vessel:$('fVessel').value.trim(),cost:$('fCost').value!==''?parseFloat($('fCost').value):null,note:$('fNote').value.trim(),updated_at:new Date().toISOString()};try{const {error}=id?await supabase.from('recipes').update(recipeData).eq('id',id):await supabase.from('recipes').insert(recipeData);if(error)throw error;if(id){const idx=db.recipes.findIndex(x=>x.id===id);if(idx!==-1)db.recipes[idx]={...db.recipes[idx],...recipeData}}else db.recipes.unshift(recipeData);modal.classList.remove('show');drawFilters();drawList();if($('detail').classList.contains('show')&&id)openRecipe(id);setStatus('☁ Изменения сохранены')}catch(err){console.error(err);alert('Не удалось сохранить техкарту: '+err.message)}};
 $('themeGrid').addEventListener('click',async e=>{const btn=e.target.closest('[data-theme-choice]');if(!btn||!currentStaff)return;const theme=btn.dataset.themeChoice;applyTheme(theme);$('themeStatus').textContent='Сохранение оформления...';const {error}=await supabase.from('profiles').upsert({staff_id:profileKey(),theme,updated_at:new Date().toISOString()},{onConflict:'staff_id'});$('themeStatus').textContent=error?'Не удалось сохранить: '+error.message:'Цвет оформления сохранён.'});
-$('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logoutBtn').onclick=logout;$('openAuthBtn').onclick=()=>{$('authModal').classList.add('show');clearError('loginError');if(currentStaff?.role==='manager')refreshStaffList().catch(e=>console.error(e))};$('navAuth').onclick=()=>$('authModal').classList.add('show');$('addBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('recipeModal').classList.remove('show');
+$('loginBtn').onclick=login;$('loginPassword').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('logoutBtn').onclick=logout;$('openAuthBtn').onclick=()=>{$('authModal').classList.add('show');clearError('loginError');if(currentStaff?.role==='manager')refreshStaffList().catch(e=>console.error(e))};$('navAuth').onclick=()=>$('authModal').classList.add('show');$('addBtn').onclick=()=>openModal();$('closeModal').onclick=()=>$('recipeModal').classList.remove('show');
 $('back').onclick=()=>{currentDetailId=null;$('detail').classList.remove('show');$('catalog').classList.remove('hide');$('settings').classList.remove('show')};$('navHome').onclick=()=>{ $('settings').classList.remove('show');$('back').click();document.querySelectorAll('.navitem').forEach(x=>x.classList.remove('active'));$('navHome').classList.add('active');active='Все';query='';$('q').value='';drawFilters();drawList()};$('navSearch').onclick=()=>{$('settings').classList.remove('show');$('back').click();document.querySelectorAll('.navitem').forEach(x=>x.classList.remove('active'));$('navSearch').classList.add('active');$('q').focus()};$('navSettings').onclick=()=>{if(!currentStaff)return alert('Сначала войдите в систему.');$('catalog').classList.add('hide');$('detail').classList.remove('show');$('settings').classList.add('show');document.querySelectorAll('.navitem').forEach(x=>x.classList.remove('active'));$('navSettings').classList.add('active');renderSettings()};$('q').addEventListener('input',e=>{query=e.target.value;drawList()});
 let pullStartY=0,pullDistance=0,isPulling=false,isRefreshing=false;const pullIndicator=$('pullIndicator'),pullText=$('pullText');function resetPull(){pullStartY=0;pullDistance=0;isPulling=false;if(!isRefreshing){pullIndicator.style.top='-60px';pullIndicator.classList.remove('loading')}}async function doPullRefresh(){if(isRefreshing)return;isRefreshing=true;pullIndicator.classList.add('loading');pullIndicator.style.top='calc(env(safe-area-inset-top) + 12px)';pullText.textContent='Обновление...';try{await refreshApp();if(currentDetailId&&db.recipes.some(r=>r.id===currentDetailId))openRecipe(currentDetailId);pullText.textContent='Обновлено'}catch(e){pullText.textContent='Ошибка обновления'}setTimeout(()=>{isRefreshing=false;pullIndicator.classList.remove('loading');pullIndicator.style.top='-60px';resetPull()},700)}document.addEventListener('touchstart',e=>{if(isRefreshing||e.touches.length!==1||window.scrollY>0)return;pullStartY=e.touches[0].clientY;pullDistance=0;isPulling=false},{passive:true});document.addEventListener('touchmove',e=>{if(!pullStartY||isRefreshing||e.touches.length!==1)return;const d=e.touches[0].clientY-pullStartY;if(window.scrollY>0||d<=0)return;pullDistance=d;if(d>8){isPulling=true;e.preventDefault();pullIndicator.style.top=`${Math.min(d,90)-58}px`;pullText.textContent=d>=75?'Отпустите для обновления':'Потяните для обновления'}},{passive:false});document.addEventListener('touchend',()=>{if(!isPulling||isRefreshing){resetPull();return}if(pullDistance>=75)doPullRefresh();else resetPull()});document.addEventListener('touchcancel',resetPull);
 (async()=>{drawFilters();drawList();if(!supabase){setStatus('⚠ Не загрузилась библиотека Supabase. Проверьте интернет и обновите страницу.');$('authModal').classList.add('show');$('loginBtn').disabled=true;showError('loginError','Не удалось подключиться к модулю авторизации. Обновите страницу или попробуйте другую сеть.');return}try{const {data:{session}}=await supabase.auth.getSession();if(session){currentUser=session.user;await loadStaff();await loadRecipes();$('authModal').classList.remove('show')}else{$('authModal').classList.add('show');setStatus('Войдите в систему')}}catch(e){console.error(e);setStatus('⚠ '+(e.message||'Ошибка подключения'));$('authModal').classList.add('show')}})();
