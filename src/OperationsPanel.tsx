@@ -85,6 +85,6 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
 
 function WriteoffHistory({staff,manager}:{staff:Staff;manager:boolean}) {
  const [rows,setRows]=useState<any[]>([])
- useEffect(()=>{let q=supabase.from('writeoffs').select('id,item_name,quantity,unit,reason,comment,occurred_at,staff:staff_id(name)').order('occurred_at',{ascending:false}).limit(100);if(!manager)q=q.eq('staff_id',staff.id);void q.then(({data})=>setRows(data||[]))},[staff.id,manager])
+ useEffect(()=>{let q=supabase.from('writeoffs').select('id,item_name,quantity,unit,reason,comment,occurred_at,staff(name)').order('occurred_at',{ascending:false}).limit(100);if(!manager)q=q.eq('staff_id',staff.id);void q.then(({data})=>setRows(data||[]))},[staff.id,manager])
  return <div className="ops-list">{rows.map(r=><div className="ops-item" key={r.id}><div><b>{r.item_name} — {r.quantity} {r.unit}</b><small>{r.reason} · {new Date(r.occurred_at).toLocaleString('ru-RU')} · {r.staff?.name||'Сотрудник'}</small>{r.comment&&<small>{r.comment}</small>}</div></div>)}{!rows.length&&<p>Списаний пока нет.</p>}</div>
 }
