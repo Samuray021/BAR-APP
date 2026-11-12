@@ -46,3 +46,77 @@ body{background:radial-gradient(ellipse at 50% -28%,#414943 0,transparent 52%),l
 @keyframes splash-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 @media(prefers-reduced-motion:reduce){.splash-content{animation:none}}
 @media(max-width:700px){.topbar{background:#222824ed}.mobile-nav{background:#202622f2;border-color:#414944}.studio-splash{min-height:100dvh}}
+
+
+/* BAR ASSIST stone-grey palette refinement */
+.app-shell,
+.app-shell.accent-green,
+.app-shell.accent-blue,
+.app-shell.accent-orange,
+.app-shell.accent-purple{
+  --bg:#202326;
+  --panel:#292d30;
+  --panel2:#34393c;
+  --line:#4a5053;
+  --text:#e5e6e3;
+  --muted:#a9adae;
+  --accent:#c3c6c4;
+  --accent2:#9ca3a1;
+  color:var(--text);
+  background:
+    radial-gradient(ellipse at 48% -18%,rgba(143,151,151,.19),transparent 54%),
+    linear-gradient(145deg,#282d30 0%,#1c2023 55%,#252a2d 100%);
+}
+body{
+  background:
+    radial-gradient(ellipse at 50% -20%,rgba(150,157,156,.2),transparent 56%),
+    linear-gradient(145deg,#202427,#171b1e 72%);
+  background-attachment:fixed;
+}
+.app-shell .topbar{
+  background:linear-gradient(100deg,rgba(57,63,66,.97),rgba(35,40,43,.97));
+  border-color:#50575a;
+}
+.app-shell .sidebar,
+.app-shell .mobile-nav{border-color:#4a5053}
+.app-shell .stat-card,
+.app-shell .recipe-card,
+.app-shell .ops-card,
+.app-shell .schedule-day,
+.app-shell .coming-soon,
+.app-shell .ops-item{
+  background:linear-gradient(145deg,#363c3f 0%,#292e31 76%);
+  border-color:#4b5255;
+}
+.app-shell .schedule-day-head{background:#3b4144}
+.app-shell .nav-item.active{background:#3a4144;color:#e0e2df}
+.app-shell .status-dot{background:#aeb6b2}
+.app-shell .schedule-shift-time,
+.app-shell .hours-value{color:#c5cbc7}
+.app-shell .primary-btn{background:linear-gradient(145deg,#c0c5c1,#929a96);color:#202528;border-color:#d0d4d1}
+.brand-symbol-stack{display:flex;flex-direction:column;align-items:center;gap:4px;flex:0 0 auto}
+.brand-symbol-stack .brand-mark{margin:0}
+.brand-symbol-stack small{
+  display:block;
+  white-space:nowrap;
+  color:#aeb4b2;
+  font-size:8px;
+  line-height:1.2;
+  letter-spacing:.025em;
+  text-transform:none;
+}
+.brand-lockup.compact{gap:11px}
+.brand-lockup.compact>div:last-child{display:flex;flex-direction:column;gap:3px}
+.login-screen{
+  background:
+    radial-gradient(ellipse at 50% 0%,rgba(146,154,153,.22),transparent 54%),
+    linear-gradient(145deg,#282d30,#191e21 75%);
+}
+.login-card{background:linear-gradient(145deg,#3a4042 0%,#292f32 48%,#202528 100%);border-color:#596164}
+.studio-splash{
+  background:radial-gradient(ellipse at 50% 38%,#51585a 0%,#383f41 36%,#242a2d 76%,#171c1f 100%);
+}
+@media(max-width:700px){
+  .app-shell .topbar{background:linear-gradient(100deg,#373e41ed,#242a2ded)}
+  .app-shell .mobile-nav{background:#292f32f5}
+}
