@@ -127,7 +127,6 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
    const {data:employees,error:staffError}=await supabase.from('staff').select('id,name').order('name')
    if(staffError)throw staffError
    const staffList=(employees||[]) as {id:string;name:string}[]
-   const employeeNames=new Map(staffList.map(x=>[x.id,x.name]))
    const monthBuckets=new Map<string,Map<string,number[]>>()
    const ensureMonth=(year:number,month:number)=>{
     const key=year+'-'+pad(month+1)
