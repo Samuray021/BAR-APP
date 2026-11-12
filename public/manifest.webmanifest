@@ -1,0 +1,10 @@
+{
+  "name": "BAR APP",
+  "short_name": "BAR APP",
+  "description": "Рабочее пространство бара",
+  "start_url": "/BAR-APP/",
+  "display": "standalone",
+  "background_color": "#141916",
+  "theme_color": "#171b19",
+  "icons": [{ "src": "/BAR-APP/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
