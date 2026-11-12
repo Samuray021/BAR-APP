@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import ExcelJS from 'exceljs'
 import type { Staff } from './types'
 import { supabase } from './lib/supabase'
 
@@ -38,6 +39,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  const [employeeRole,setEmployeeRole]=useState<'bartender'|'manager'>('bartender')
  const [localMessage,setLocalMessage]=useState('')
  const [monthHours,setMonthHours]=useState(0)
+ const [exporting,setExporting]=useState<'schedule'|'recipes'|null>(null)
 
  const report=(s:string)=>{setLocalMessage(s);onMessage(s)}
  const weekStart=useMemo(()=>monday(anchor),[anchor])
@@ -89,6 +91,121 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
  const createEmployee=async(e:FormEvent)=>{e.preventDefault();setBusy(true);const {data,error}=await supabase.functions.invoke('clever-processor',{body:{action:'create_staff',name:employeeName,username:employeeLogin,password:employeePassword,role:employeeRole}});setBusy(false);if(error||data?.error)report(error?.message||data.error);else{setEmployeeName('');setEmployeeLogin('');setEmployeePassword('');await loadTeam();report('Учётная запись создана')}}
  const toggleEmployee=async(row:Staff)=>{if(row.id===staff.id){report('Нельзя отключить собственную учётную запись');return}setBusy(true);const {data,error}=await supabase.functions.invoke('clever-processor',{body:{action:'update_staff',staff_id:row.id,active:!row.active}});setBusy(false);if(error||data?.error)report(error?.message||data.error);else{await loadTeam();report(row.active?'Доступ сотрудника отключён':'Доступ сотрудника восстановлен')}}
  const updateProfile=async(p:Profile)=>{onProfileChange(p);const {error}=await supabase.from('profiles').upsert({staff_id:staff.id,theme:p.theme,color_mode:p.color_mode,updated_at:new Date().toISOString()});if(error)report(error.message)}
+
+ const styleWorksheet=(sheet:ExcelJS.Worksheet)=>{
+  sheet.views=[{state:'frozen',ySplit:1}]
+  sheet.autoFilter={from:{row:1,column:1},to:{row:1,column:sheet.columnCount}}
+  const header=sheet.getRow(1)
+  header.height=24
+  header.eachCell(cell=>{
+   cell.font={bold:true,color:{argb:'FFFFFFFF'}}
+   cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF344536'}}
+   cell.alignment={vertical:'middle',wrapText:true}
+   cell.border={bottom:{style:'thin',color:{argb:'FF879C6B'}}}
+  })
+  sheet.eachRow((row,index)=>{if(index>1)row.alignment={vertical:'top',wrapText:true}})
+ }
+ const downloadWorkbook=async(workbook:ExcelJS.Workbook,filename:string)=>{
+  const buffer=await workbook.xlsx.writeBuffer()
+  const blob=new Blob([buffer as BlobPart],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})
+  const url=URL.createObjectURL(blob)
+  const link=document.createElement('a')
+  link.href=url;link.download=filename;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url)
+ }
+ const exportSchedule=async()=>{
+  if(!manager)return
+  setExporting('schedule')
+  try{
+   const rows: any[]=[]
+   for(let from=0;;from+=1000){
+    const {data,error}=await supabase.from('schedule_shifts').select('id,staff_id,starts_at,ends_at,note,staff:staff!schedule_shifts_staff_id_fkey(name)').order('starts_at').range(from,from+999)
+    if(error)throw error
+    rows.push(...(data||[]))
+    if(!data||data.length<1000)break
+   }
+   const workbook=new ExcelJS.Workbook()
+   workbook.creator='BAR APP'
+   workbook.created=new Date()
+   const sheet=workbook.addWorksheet('График')
+   sheet.columns=[
+    {header:'Сотрудник',key:'employee',width:28},
+    {header:'Дата',key:'date',width:15},
+    {header:'Начало',key:'start',width:12},
+    {header:'Окончание',key:'end',width:12},
+    {header:'Часы',key:'hours',width:12},
+    {header:'Комментарий',key:'note',width:42}
+   ]
+   rows.forEach(s=>{
+    const start=new Date(s.starts_at),end=new Date(s.ends_at)
+    sheet.addRow({
+     employee:s.staff?.name||staffRows.find(x=>x.id===s.staff_id)?.name||'Сотрудник',
+     date:start.toLocaleDateString('ru-RU'),
+     start:start.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),
+     end:end.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'}),
+     hours:Number(hoursBetween(s.starts_at,s.ends_at).toFixed(2)),
+     note:s.note||''
+    })
+   })
+   styleWorksheet(sheet)
+   await downloadWorkbook(workbook,'BAR-APP-grafik-'+dateKey(new Date())+'.xlsx')
+   report('График выгружен: '+rows.length+' смен')
+  }catch(e){report(e instanceof Error?'Не удалось выгрузить график: '+e.message:'Не удалось выгрузить график')}
+  finally{setExporting(null)}
+ }
+ const exportRecipes=async()=>{
+  if(!manager)return
+  setExporting('recipes')
+  try{
+   const recipes:any[]=[]
+   for(let from=0;;from+=1000){
+    const {data,error}=await supabase.from('recipes').select('*').order('name').range(from,from+999)
+    if(error)throw error
+    recipes.push(...(data||[]))
+    if(!data||data.length<1000)break
+   }
+   const workbook=new ExcelJS.Workbook()
+   workbook.creator='BAR APP'
+   workbook.created=new Date()
+   const cards=workbook.addWorksheet('Техкарты')
+   cards.columns=[
+    {header:'Название',key:'name',width:30},
+    {header:'Категория',key:'category',width:20},
+    {header:'Выход, мл',key:'yield',width:13},
+    {header:'Посуда',key:'vessel',width:20},
+    {header:'Себестоимость',key:'cost',width:16},
+    {header:'Цена',key:'price',width:13},
+    {header:'Ингредиенты',key:'ingredients',width:55},
+    {header:'Приготовление',key:'preparation',width:55},
+    {header:'Примечание',key:'note',width:40}
+   ]
+   const ingredients=workbook.addWorksheet('Состав')
+   ingredients.columns=[
+    {header:'Техкарта',key:'recipe',width:30},
+    {header:'Категория',key:'category',width:20},
+    {header:'Ингредиент',key:'ingredient',width:30},
+    {header:'Количество',key:'amount',width:16},
+    {header:'Единица',key:'unit',width:14}
+   ]
+   recipes.forEach(r=>{
+    const list=Array.isArray(r.ingredients)?r.ingredients:[]
+    cards.addRow({
+     name:r.name||'',category:r.category||'',yield:r.yield??'',
+     vessel:r.vessel||'',cost:r.cost??'',price:r.price??'',
+     ingredients:list.map((i:any)=>String(i.name||'')+' — '+String(i.amount??'')+' '+String(i.unit||'')).join('\n'),
+     preparation:r.preparation||'',note:r.note||''
+    })
+    list.forEach((i:any)=>ingredients.addRow({
+     recipe:r.name||'',category:r.category||'',ingredient:i.name||'',
+     amount:i.amount??'',unit:i.unit||''
+    }))
+   })
+   styleWorksheet(cards)
+   styleWorksheet(ingredients)
+   await downloadWorkbook(workbook,'BAR-APP-barnaya-karta-'+dateKey(new Date())+'.xlsx')
+   report('Барная карта выгружена: '+recipes.length+' техкарт')
+  }catch(e){report(e instanceof Error?'Не удалось выгрузить барную карту: '+e.message:'Не удалось выгрузить барную карту')}
+  finally{setExporting(null)}
+ }
  const shiftTitle=(s:Shift)=>manager?(staffRows.find(x=>x.id===s.staff_id)?.name||s.staff?.name||'Сотрудник'):staff.name
  const title=tab==='schedule'?'График':tab==='team'?'Команда':'Настройки аккаунта'
  return <div className="ops-page">
@@ -110,6 +227,6 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
    <div className="schedule-week">{Array.from({length:7},(_,i)=>{const day=new Date(weekStart);day.setDate(day.getDate()+i);const key=dateKey(day);const list=visibleShifts.filter(s=>dateKey(new Date(s.starts_at))===key);return <section className="schedule-day" key={key}><div className="schedule-day-head"><b>{day.toLocaleDateString('ru-RU',{weekday:'long'})}</b><span>{day.toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span></div>{list.length?list.map(s=><article className="schedule-shift" key={s.id}><div className="schedule-shift-time">{formatTime(s.starts_at)}–{formatTime(s.ends_at)}<small>{hoursBetween(s.starts_at,s.ends_at).toFixed(1)} ч</small></div><div className="schedule-shift-info"><b>{shiftTitle(s)}</b>{s.note&&<small>{s.note}</small>}</div>{manager&&<div className="schedule-actions"><button className="subtle-btn" onClick={()=>editShift(s)}>Изменить</button><button className="danger-btn" onClick={()=>void deleteShift(s.id)}>×</button></div>}</article>):<p className="schedule-empty">Смен нет</p>}</section>})}</div>
   </>}
   {tab==='team'&&<>{manager?<><div className="ops-grid"><section className="ops-card"><h3>Новый сотрудник</h3><form className="ops-form" onSubmit={createEmployee}><label>Имя и фамилия<input required value={employeeName} onChange={e=>setEmployeeName(e.target.value)}/></label><label>Логин<input required minLength={3} pattern="[a-zA-Z0-9_]{3,30}" value={employeeLogin} onChange={e=>setEmployeeLogin(e.target.value)} placeholder="Например, ivan"/></label><label>Временный пароль<input required minLength={8} type="password" value={employeePassword} onChange={e=>setEmployeePassword(e.target.value)}/></label><label>Роль<select value={employeeRole} onChange={e=>setEmployeeRole(e.target.value as 'bartender'|'manager')}><option value="bartender">Сотрудник</option><option value="manager">Управляющий</option></select></label><button className="primary-btn" disabled={busy}>Создать учётную запись</button></form></section><section className="ops-card"><h3>Управление доступом</h3><p>Отключённые учётные записи не смогут войти в приложение.</p></section></div><section className="ops-card" style={{marginTop:14}}><h3>Сотрудники</h3><div className="ops-list">{staffRows.map(row=><div className="ops-item" key={row.id}><div><b>{row.name}</b><small>@{row.username||'—'} · {row.role==='manager'?'Управляющий':'Сотрудник'} · {row.active?'Активен':'Доступ отключён'}</small></div>{row.id!==staff.id&&<button className={row.active?'danger-btn':'subtle-btn'} disabled={busy} onClick={()=>void toggleEmployee(row)}>{row.active?'Отключить':'Восстановить'}</button>}</div>)}</div></section></>:<div className="ops-card"><h3>Доступ ограничен</h3><p>Управлять учётными записями может только управляющий.</p></div>}</>}
-  {tab==='settings'&&<><section className="ops-card hours-card"><span className="ops-muted">{monthName(new Date())}</span><div className="hours-value">{monthHours.toFixed(1)} <small>ч</small></div><b>Часы по графику за месяц</b><p>Сумма длительности назначенных смен, включая смены, переходящие через полночь. Это плановое время по графику, а не отметки фактического прихода и ухода.</p></section><section className="ops-card ops-settings" style={{marginTop:14}}><h3>Оформление приложения</h3><p>Настройки сохраняются в профиле и применяются при следующем входе на любом устройстве.</p><b>Цвет акцента</b><div className="swatches">{[{id:'green',color:'#b5c79a'},{id:'blue',color:'#8fb8e8'},{id:'orange',color:'#e9ad78'},{id:'purple',color:'#c1a2e8'}].map(x=><button key={x.id} aria-label={x.id} className={'swatch '+(profile.theme===x.id?'selected':'')} style={{background:x.color}} onClick={()=>void updateProfile({...profile,theme:x.id})}/>)}</div><b>Тема</b><div className="mode-choice" style={{marginTop:12}}><button className={profile.color_mode==='dark'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'dark'})}>Тёмная</button><button className={profile.color_mode==='light'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'light'})}>Светлая</button></div><p className="ops-muted" style={{marginTop:18}}>Аккаунт: {staff.name} · {staff.role==='manager'?'Управляющий':'Сотрудник'}</p></section></>}
+  {tab==='settings'&&<><section className="ops-card hours-card"><span className="ops-muted">{monthName(new Date())}</span><div className="hours-value">{monthHours.toFixed(1)} <small>ч</small></div><b>Часы по графику за месяц</b><p>Сумма длительности назначенных смен, включая смены, переходящие через полночь. Это плановое время по графику, а не отметки фактического прихода и ухода.</p></section>{manager&&<section className="ops-card ops-settings export-settings" style={{marginTop:14}}><h3>Экспорт данных</h3><p>Скачайте актуальные данные приложения в формате Excel (.xlsx).</p><div className="export-actions"><button className="primary-btn" disabled={exporting!==null} onClick={()=>void exportSchedule()}>{exporting==='schedule'?'Формируем файл…':'Выгрузить график в Excel'}</button><button className="subtle-btn" disabled={exporting!==null} onClick={()=>void exportRecipes()}>{exporting==='recipes'?'Формируем файл…':'Выгрузить барную карту в Excel'}</button></div></section>}<section className="ops-card ops-settings" style={{marginTop:14}}><h3>Оформление приложения</h3><p>Настройки сохраняются в профиле и применяются при следующем входе на любом устройстве.</p><b>Цвет акцента</b><div className="swatches">{[{id:'green',color:'#b5c79a'},{id:'blue',color:'#8fb8e8'},{id:'orange',color:'#e9ad78'},{id:'purple',color:'#c1a2e8'}].map(x=><button key={x.id} aria-label={x.id} className={'swatch '+(profile.theme===x.id?'selected':'')} style={{background:x.color}} onClick={()=>void updateProfile({...profile,theme:x.id})}/>)}</div><b>Тема</b><div className="mode-choice" style={{marginTop:12}}><button className={profile.color_mode==='dark'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'dark'})}>Тёмная</button><button className={profile.color_mode==='light'?'primary-btn':'subtle-btn'} onClick={()=>void updateProfile({...profile,color_mode:'light'})}>Светлая</button></div><p className="ops-muted" style={{marginTop:18}}>Аккаунт: {staff.name} · {staff.role==='manager'?'Управляющий':'Сотрудник'}</p></section></>}
  </div>
 }
