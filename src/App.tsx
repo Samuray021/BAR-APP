@@ -58,8 +58,54 @@ export default function App() {
   }, [])
 
   useEffect(() => {
+    const playOpeningSound = () => {
+      const AudioContextClass = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextClass) return
+      const context = new AudioContextClass()
+      const start = () => {
+        const now = context.currentTime
+        const master = context.createGain()
+        master.gain.setValueAtTime(0.0001, now)
+        master.gain.exponentialRampToValueAtTime(0.12, now + 0.035)
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.15)
+        master.connect(context.destination)
+        ;[523.25, 659.25, 783.99, 1046.5].forEach((frequency, index) => {
+          const oscillator = context.createOscillator()
+          const gain = context.createGain()
+          const at = now + index * 0.105
+          oscillator.type = 'sine'
+          oscillator.frequency.setValueAtTime(frequency, at)
+          gain.gain.setValueAtTime(0.0001, at)
+          gain.gain.exponentialRampToValueAtTime(index === 3 ? 0.55 : 0.32, at + 0.025)
+          gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.72)
+          oscillator.connect(gain)
+          gain.connect(master)
+          oscillator.start(at)
+          oscillator.stop(at + 0.76)
+        })
+        window.setTimeout(() => { void context.close() }, 1500)
+      }
+      if (context.state === 'running') start()
+      else void context.resume().then(start).catch(() => { void context.close() })
+    }
+    let played = false
+    const playOnce = () => {
+      if (played) return
+      played = true
+      playOpeningSound()
+      window.removeEventListener('pointerdown', playOnce)
+      window.removeEventListener('keydown', playOnce)
+    }
+    // Browsers may block sound until the first user gesture.
+    playOnce()
+    window.addEventListener('pointerdown', playOnce, { once: true })
+    window.addEventListener('keydown', playOnce, { once: true })
     const splashTimer = window.setTimeout(() => setSplashVisible(false), 5000)
-    return () => window.clearTimeout(splashTimer)
+    return () => {
+      window.clearTimeout(splashTimer)
+      window.removeEventListener('pointerdown', playOnce)
+      window.removeEventListener('keydown', playOnce)
+    }
   }, [])
 
   useEffect(() => {
