@@ -32,3 +32,6 @@ VITE_SUPABASE_PUBLISHABLE_KEY=<publishable-key>
 - Адаптивная оболочка с мобильной навигацией.
 
 Следующие этапы: заготовки, списания, открытие смены с фотографиями, управление сотрудниками, уведомления.
+
+
+Build checks are executed by GitHub Actions on every push to `rebuild-v1`.
