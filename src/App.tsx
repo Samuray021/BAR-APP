@@ -97,7 +97,6 @@ export default function App() {
       window.removeEventListener('keydown', playOnce)
     }
     // Browsers may block sound until the first user gesture.
-    playOnce()
     window.addEventListener('pointerdown', playOnce, { once: true })
     window.addEventListener('keydown', playOnce, { once: true })
     const splashTimer = window.setTimeout(() => setSplashVisible(false), 5000)
