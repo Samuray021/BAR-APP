@@ -1,10 +1,17 @@
 {
-  "name": "BAR APP",
-  "short_name": "BAR APP",
-  "description": "Рабочее пространство бара",
+  "name": "BAR ASSIST",
+  "short_name": "BAR ASSIST",
+  "description": "Современная система управления баром",
   "start_url": "/BAR-APP/",
   "display": "standalone",
-  "background_color": "#141916",
-  "theme_color": "#171b19",
-  "icons": [{ "src": "/BAR-APP/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "background_color": "#202622",
+  "theme_color": "#202622",
+  "icons": [
+    {
+      "src": "/BAR-APP/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
 }
