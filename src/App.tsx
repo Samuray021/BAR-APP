@@ -10,7 +10,8 @@ const nav: { id: Tab; title: string; icon: string }[] = [
   { id: 'writeoff', title: 'Списание', icon: '−' }, { id: 'shift', title: 'Открытие смены', icon: '▤' },
   { id: 'team', title: 'Команда', icon: '♙' },
 ]
-const blank = () => ({ name: '', category: 'Коктейли', ingredients: [{ name: '', amount: '', unit: 'мл' }], preparation: '', yield: 0, vessel: '', cost: 0, price: 0, note: '' })
+type RecipeDraft = { name: string; category: string; ingredients: Ingredient[]; preparation: string; yield: number; vessel: string; cost: number; price: number; note: string }
+const blank = (): RecipeDraft => ({ name: '', category: 'Коктейли', ingredients: [{ name: '', amount: '', unit: 'мл' }], preparation: '', yield: 0, vessel: '', cost: 0, price: 0, note: '' })
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null)
@@ -28,7 +29,7 @@ export default function App() {
   const [selected, setSelected] = useState<Recipe | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editing, setEditing] = useState<Recipe | null>(null)
-  const [draft, setDraft] = useState(blank())
+  const [draft, setDraft] = useState<RecipeDraft>(blank())
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
   const manager = staff?.role === 'manager'
