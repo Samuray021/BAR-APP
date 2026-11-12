@@ -64,6 +64,8 @@ nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(540px,
 .btn-outline{background:transparent;border:1px solid var(--line);color:var(--text)}
 .manager-only{display:none!important}
 body.is-manager .manager-only{display:flex!important}
+body.is-manager .manager-only-block{display:block!important}
+.manager-only-block{display:none!important}
 
 .modal{position:fixed;inset:0;background:rgba(0,0,0,0.78);backdrop-filter:blur(3px);display:none;justify-content:center;align-items:center;z-index:100;padding:16px}
 .modal.show{display:flex}
@@ -82,6 +84,8 @@ body.is-manager .manager-only{display:flex!important}
 .pin-box{display:none;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .pin-box.show{display:block}
 .error-msg{color:var(--danger);font-size:12px;margin-top:6px;display:none}
+.staff-row{display:flex;justify-content:space-between;align-items:center;background:#151b17;padding:8px 12px;border-radius:10px;margin-bottom:6px;font-size:13px}
+.sync-status{font-size:11px;color:var(--olive);text-align:right;margin-bottom:6px}
 @media(min-width:540px){body{background:#101411}.app{border-left:1px solid #202820;border-right:1px solid #202820}}
 </style>
 </head>
@@ -98,11 +102,12 @@ body.is-manager .manager-only{display:flex!important}
   <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;">
     <div>
       <h1>Что будем<br>готовить?</h1>
-      <div class="sub">Быстрый доступ к технологическим картам</div>
+      <div class="sub">Облачные технологические карты</div>
     </div>
     <button class="btn manager-only" id="addBtn" style="margin-top:8px;white-space:nowrap;">+ Добавить</button>
   </div>
   
+  <div class="sync-status" id="syncStatus">☁ Синхронизация с облаком...</div>
   <div class="search"><span>⌕</span><input id="q" placeholder="Название или ингредиент" autocomplete="off"><span style="color:var(--muted)">⌘</span></div>
   <div class="sectionhead"><b>Категории</b><span class="count">Фильтр</span></div>
   <div class="filters" id="filters"></div>
@@ -120,39 +125,33 @@ body.is-manager .manager-only{display:flex!important}
 <div class="modal" id="authModal">
   <div class="modal-content">
     <h2>Вход в систему</h2>
-    <p class="tiny" style="margin-bottom:16px;">Выберите режим работы в приложении:</p>
+    <p class="tiny" style="margin-bottom:12px;">Выберите сотрудника или управляющего:</p>
     
-    <div class="auth-card" id="selectBartender">
-      <div>
-        <div style="font-weight:700;font-size:15px;">Бармен</div>
-        <div class="tiny">Просмотр ТТК, поиск и калькулятор порций</div>
+    <div class="form-group">
+      <select id="userSelect" style="width:100%;background:#151b17;border:1px solid var(--line);border-radius:10px;padding:10px;color:var(--text);font-size:14px;outline:none;">
+        <option value="manager">Управляющий (Master PIN)</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>PIN-код</label>
+      <input type="password" id="loginPin" placeholder="••••" maxlength="6" style="font-size:18px;letter-spacing:4px;">
+    </div>
+
+    <button class="btn" id="loginBtn" style="width:100%;margin-top:6px;">Войти</button>
+
+    <!-- Управление персоналом (доступно управляющему) -->
+    <div class="manager-only-block" style="margin-top:18px;padding-top:14px;border-top:1px solid var(--line);">
+      <h3 style="font-size:14px;margin-bottom:8px;">Управление персоналом (Бармены)</h3>
+      <div id="staffList"></div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <input type="text" id="newStaffName" placeholder="Имя бармена" style="flex:2;">
+        <input type="password" id="newStaffPin" placeholder="PIN" style="flex:1;" maxlength="6">
+        <button class="btn" id="addStaffBtn" style="font-size:12px;padding:8px;white-space:nowrap;">+ Добавить</button>
       </div>
-      <span style="color:var(--olive);font-size:18px;">→</span>
     </div>
 
-    <div class="auth-card" id="selectManager">
-      <div>
-        <div style="font-weight:700;font-size:15px;">Управляющий</div>
-        <div class="tiny">Полный доступ: создание, правка и удаление</div>
-      </div>
-      <span style="color:var(--olive);font-size:14px;">🔒 PIN</span>
-    </div>
-
-    <div class="pin-box" id="pinBox">
-      <div class="form-group">
-        <label>Введите PIN-код управляющего (для теста: <b>1234</b>)</label>
-        <input type="password" id="pinInput" maxlength="4" placeholder="••••" inputmode="numeric" style="text-align:center;font-size:20px;letter-spacing:6px;">
-        <div class="error-msg" id="pinError">Неверный PIN-код. Попробуйте 1234</div>
-      </div>
-      <button class="btn" id="confirmPinBtn" style="width:100%;">Войти как управляющий</button>
-    </div>
-
-    <div class="manager-only" style="margin-top:16px;padding-top:16px;border-top:1px solid var(--line);justify-content:space-between;align-items:center;">
-      <span class="tiny">Сбросить изменения к исходным:</span>
-      <button class="btn btn-outline" id="resetDataBtn" style="font-size:11px;padding:6px 10px;">Сбросить базу</button>
-    </div>
-
-    <button class="btn btn-outline" id="closeAuthBtn" style="width:100%;margin-top:12px;">Закрыть</button>
+    <button class="btn btn-outline" id="closeAuthBtn" style="width:100%;margin-top:14px;">Закрыть</button>
   </div>
 </div>
 
@@ -207,7 +206,7 @@ body.is-manager .manager-only{display:flex!important}
         <input type="text" id="fNote" placeholder="Например: Только в iiko">
       </div>
       <div style="display:flex;gap:10px;margin-top:18px;">
-        <button type="submit" class="btn" style="flex:1;">Сохранить</button>
+        <button type="submit" class="btn" style="flex:1;">Сохранить в облако</button>
         <button type="button" class="btn btn-outline" id="closeModal" style="flex:1;">Отмена</button>
       </div>
     </form>
@@ -221,163 +220,148 @@ body.is-manager .manager-only{display:flex!important}
 </nav>
 
 <script>
-const MANAGER_PIN = "1234";
+// =========================================================================
+// НАСТРОЙКА ОБЛАЧНОГО ХРАНИЛИЩА (ТВОИ КЛЮЧИ УЖЕ ВСТАВЛЕНЫ НИЖЕ):
+// =========================================================================
+const BIN_ID = "6af5b436ac6210605a8247c3"; 
+const API_KEY = "$2a$10$e0tnwD9mty6LUdu53g2Dfuc4R48jVV57ZPhll4IcndpOe0W31LbyK";
+const MANAGER_PIN = "1234"; // PIN управляющего по умолчанию
 
-const defaultRecipes = [
-  {"id": "r4", "name": "Лимончелло", "category": "Настойки", "ingredients": [{"name": "Лимончелло  п/ф", "amount": 40.0}], "preparation": "", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 16.81, "price": 250.0, "note": "", "source_row": 4},
-  {"id": "r6", "name": "Клюквенная", "category": "Настойки", "ingredients": [{"name": "Клюквенная настойка п/ф", "amount": 40.0}], "preparation": "", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 29.14, "price": 250.0, "note": "", "source_row": 6},
-  {"id": "r9", "name": "Боярский", "category": "Шоты", "ingredients": [{"name": "Водка хаус", "amount": 30.0}, {"name": "Сироп в асс (гренадин)", "amount": 10.0}, {"name": "Табаско", "amount": 2.0}], "preparation": "Взять чистый сухой шот, налить слоями по барной ложке, сначала Сироп гренадин, затем водку, в конце добавить тобаско 2 капли.\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 36.18, "price": 250.0, "note": "", "source_row": 9},
-  {"id": "r13", "name": "Б-52", "category": "Шоты", "ingredients": [{"name": "Ликер в асс (сливочный)", "amount": 15.0}, {"name": "Ликер в асс (трипл сек)", "amount": 15.0}, {"name": "Ликер в асс (кофе)", "amount": 10.0}], "preparation": "В шот налить слоями по барной ложке, сначала кофейный ликер, затем кремовый ликёр, трипл сек. Коктейль поджигается и выпивается через трубочку\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 34.73, "price": 250.0, "note": "", "source_row": 13},
-  {"id": "r17", "name": "Б-53", "category": "Шоты", "ingredients": [{"name": "Ликер в асс (сливочный)", "amount": 15.0}, {"name": "Абсент", "amount": 10.0}, {"name": "Ликер в асс (кофе)", "amount": 15.0}], "preparation": "В шот налить слоями по барной ложке, сначала кофейный ликер, затем трипл сек и абсент. Коктейль поджигается и выпивается через трубочку\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 38.22, "price": 250.0, "note": "Только в айко", "source_row": 17},
-  {"id": "r21", "name": "Львица", "category": "Шоты", "ingredients": [{"name": "Ликер в асс ( банан )", "amount": 10.0}, {"name": "Джин босфор ", "amount": 15.0}, {"name": "Самбука", "amount": 10.0}, {"name": "Фреш ", "amount": 5.0}], "preparation": "В шот налить слоями по барной ложке, сначала самбуку , ликер банан, джин и фреш.\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": null, "price": null, "note": "", "source_row": 21},
-  {"id": "r26", "name": "Камикадзе", "category": "Шоты", "ingredients": [{"name": "Сироп в асс (Блю курасао)", "amount": 10.0}, {"name": "Водка хаус", "amount": 30.0}, {"name": "Лимонный сок п\\ф", "amount": 10.0}], "preparation": "В шот налить слоями по барной ложке, сначала сиропу , Водку , фреш\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": null, "price": null, "note": "", "source_row": 26},
-  {"id": "r30", "name": "Хиросима", "category": "Шоты", "ingredients": [{"name": "Самбука ", "amount": 15.0}, {"name": "Ликер в асс (сливочный)", "amount": 10.0}, {"name": "Абсент ", "amount": 15.0}, {"name": "Сироп в асс (гренадин)", "amount": 1.0}], "preparation": "В шот налить слоями: самбуку, кремовый ликер, абсент, и сверху добавить каплю сироп гренадина. Коктейль поджигается и выпивается через трубочку. \nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": null, "price": null, "note": "", "source_row": 30},
-  {"id": "r36", "name": "Негрони от Соседа", "category": "Коктейли", "ingredients": [{"name": "Джин Босфор ", "amount": 30.0}, {"name": "Вермут Мартини Россо ", "amount": 30.0}, {"name": "Биттер Гамбини ", "amount": 30.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 36},
-  {"id": "r41", "name": "Май Тай от соседа", "category": "Коктейли", "ingredients": [{"name": "Ром Оакхарт Блек ", "amount": 30.0}, {"name": "Ром Маракуйя ", "amount": 20.0}, {"name": "Ликер Трипл сек ", "amount": 20.0}, {"name": "Сок Ананас ", "amount": 50.0}, {"name": "Сироп Миндаль ", "amount": 20.0}, {"name": "Лимонный сок ", "amount": 20.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 365.0, "vessel": "Хайболл", "cost": null, "price": null, "note": "", "source_row": 41},
-  {"id": "r49", "name": "Бульвардье от соседа", "category": "Коктейли", "ingredients": [{"name": "Виски Хаус", "amount": 40.0}, {"name": "Вермут Мартини Россо ", "amount": 30.0}, {"name": "Биттер Гамбини ", "amount": 30.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 49},
-  {"id": "r54", "name": "Аперольчик ТРУ КОСТ", "category": "Коктейли", "ingredients": [{"name": "Аперитиво хаус", "amount": 30.0}, {"name": "Игристое хаус", "amount": 50.0}, {"name": "Вода ПЭТ газ", "amount": 30.0}, {"name": "Апельсин", "amount": 20.0}], "preparation": "Билд всех ингредиетов на кусковой лед. Стир", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 52.0, "price": 250.0, "note": "", "source_row": 54},
-  {"id": "r59", "name": "Танцы", "category": "Коктейли", "ingredients": [{"name": "Водка Хаус", "amount": 40.0}, {"name": "Кордиал Апельсин Ройбуш ", "amount": 20.0}, {"name": "Сок Яблоко ", "amount": 50.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": 250.0, "note": "", "source_row": 59},
-  {"id": "r63", "name": "Sex on the Beach ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Водка хаус", "amount": 20.0}, {"name": "Ликер в асс (персик)", "amount": 10.0}, {"name": "Сок в асс (ананас)", "amount": 30.0}, {"name": "Сок в асс (морс)", "amount": 30.0}, {"name": "Апельсин", "amount": 20.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденный бокал", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 42.71, "price": 250.0, "note": "", "source_row": 63},
-  {"id": "r69", "name": "William Lawson's & Cola ( ТРУК КОСТ )", "category": "Коктейли", "ingredients": [{"name": "William Lawson's", "amount": 30.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 80.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "Бакарди", "source_row": 69},
-  {"id": "r72", "name": "ВИСКИ КОЛА ( ТРУК КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Виски Bar Edition Whiskey-Added", "amount": 30.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 80.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "Лудинг", "source_row": 72},
-  {"id": "r75", "name": "РОМ КОЛА ( ТРУК КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Ром Bar Edition Whiskey-Added", "amount": 30.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 80.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "Лудинг", "source_row": 75},
-  {"id": "r78", "name": "Bosford & Tonic ( ТРУК КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Джин Bosford", "amount": 30.0}, {"name": "Лимонад ПЭТ в асс (тоник)", "amount": 80.0}, {"name": "Лимон", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 78},
-  {"id": "r82", "name": "Oakheart & Cola ( ТРУ КОСТ)", "category": "Коктейли", "ingredients": [{"name": "Oakheart Блек", "amount": 30.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 80.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "Бакарди", "source_row": 82},
-  {"id": "r85", "name": "Hunting Cola ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Beluga Hunting Herbal", "amount": 30.0}, {"name": "Сок лимона п/ф", "amount": 10.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 80.0}, {"name": "Лимон ", "amount": 2.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "Белуга", "source_row": 85},
-  {"id": "r90", "name": "Tequila Sunrise ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Текила хаус", "amount": 25.0}, {"name": "Сироп в асс (гренадин)", "amount": 5.0}, {"name": "Сок в асс (апельсин)", "amount": 70.0}, {"name": "Апельсин", "amount": 20.0}], "preparation": "Сделать билд всех ингредиентов в бокал со льдом, бокал должен быть ПРЕДВАРИТЕЛЬНО охлажден. Сверху налить сироп гренадин и перемешать/либо предварительно предупредить гостей, что напиток необходимо перемешать.", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 52.57, "price": 250.0, "note": "", "source_row": 90},
-  {"id": "r95", "name": "White Russian", "category": "Коктейли", "ingredients": [{"name": "Водка хаус", "amount": 30.0}, {"name": "Ликер в асс (кофе)", "amount": 20.0}, {"name": "Сливки 11%", "amount": 30.0}], "preparation": "Насыпать кусковой лед, охладить бокал, вылить излишки воды, налить все ингредиенты по джигеру, сделать стир", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 46.6, "price": 250.0, "note": "", "source_row": 95},
-  {"id": "r99", "name": "Long Island ( ТРУ КОСТ ) Обновление ТТК", "category": "Коктейли", "ingredients": [{"name": "Джин Bosford", "amount": 5.0}, {"name": "Ликёр в асс (трипл сек)", "amount": 5.0}, {"name": "Водка хаус", "amount": 5.0}, {"name": "Текила хаус", "amount": 5.0}, {"name": "Ром хаус", "amount": 5.0}, {"name": "Сахарный сироп п/ф", "amount": 5.0}, {"name": "Сок лимона п/ф", "amount": 15.0}, {"name": "Лимонад ПЭТ в асс (Кола)", "amount": 60.0}, {"name": "Лимон", "amount": 20.0}], "preparation": "Сделать билд всех ингредиентов в бокал со льдом, бокал должен быть ПРЕДВАРИТЕЛЬНО охлажден. Сверху налить все ингредиенты. Перемешать\n", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": 250.0, "note": "", "source_row": 99},
-  {"id": "r109", "name": "Pina Colada ( ТРУ КОСТ  )", "category": "Коктейли", "ingredients": [{"name": "Ром хаус", "amount": 30.0}, {"name": "Сок в асс (ананас)", "amount": 60.0}, {"name": "Сироп в асс (кокос)", "amount": 15.0}, {"name": "Сливки 11%", "amount": 15.0}, {"name": "Ананас (чипс)", "amount": 10.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденный бокал", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 54.98, "price": 250.0, "note": "", "source_row": 109},
-  {"id": "r115", "name": "Mojito ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Ром хаус", "amount": 30.0}, {"name": "Лайм", "amount": 30.0}, {"name": "Мята", "amount": 10.0}, {"name": "Сахарный сироп п/ф", "amount": 10.0}, {"name": "Вода ПЭТ газ", "amount": 80.0}], "preparation": "Мадл 4 вейджев лайма и 8 грамм мяты, засыпать КОЛОТЫМ льдом, билд всех ингредиентов, стир", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 58.28, "price": 250.0, "note": "", "source_row": 115},
-  {"id": "r121", "name": "Скажи зачем ( ТРУ КОСТ  )", "category": "Коктейли", "ingredients": [{"name": "Водка хаус", "amount": 30.0}, {"name": "Абсент", "amount": 10.0}, {"name": "Сироп в асс (кокос)", "amount": 5.0}, {"name": "Сироп в асс (блю кюрасао)", "amount": 5.0}, {"name": "Сок в асс (апельсин)", "amount": 40.0}, {"name": "Сок в асс (персик)", "amount": 40.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденный бокал", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 49.67, "price": 250.0, "note": "", "source_row": 121},
-  {"id": "r128", "name": "Английский поцелуй ( ТРУ КОСТ  )", "category": "Коктейли", "ingredients": [{"name": "Джин Босфор ", "amount": 40.0}, {"name": "Сок в асс (вишня)", "amount": 70.0}, {"name": "Сироп в асс (личи)", "amount": 10.0}, {"name": "Апельсин", "amount": 15.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденный бокал", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 40.93, "price": 250.0, "note": "АСГ", "source_row": 128},
-  {"id": "r133", "name": "Martini Bianco & Tonic", "category": "Коктейли", "ingredients": [{"name": "Martini Bianco", "amount": 40.0}, {"name": "Лимонад ПЭТ в асс (тоник)", "amount": 80.0}, {"name": "Лайм", "amount": 15.0}], "preparation": "Билд всех ингредиетов на кусковой лед. Топ ап тоник. Стир", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 76.4, "price": 250.0, "note": "Бакарди", "source_row": 133},
-  {"id": "r137", "name": "Martini Fiero & Tonic", "category": "Коктейли", "ingredients": [{"name": "Martini Fiero", "amount": 40.0}, {"name": "Лимонад ПЭТ в асс (тоник)", "amount": 80.0}, {"name": "Апельсин", "amount": 30.0}], "preparation": "Билд всех ингредиетов на кусковой лед. Топ ап тоник. Стир", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 75.17, "price": 250.0, "note": "Бакарди", "source_row": 137},
-  {"id": "r141", "name": "Выбирай сама ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Ром хаус", "amount": 15.0}, {"name": "Вермут в асс (россо)", "amount": 15.0}, {"name": "Сок лимона п/ф", "amount": 15.0}, {"name": "Сироп в асс (личи)", "amount": 15.0}, {"name": "Сок в асс (ананас)", "amount": 60.0}, {"name": "Мята", "amount": 3.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденный бокал", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 66.63, "price": 250.0, "note": "Белуга", "source_row": 141},
-  {"id": "r148", "name": "Botanicals Toniс ( ТРУ КОСТ )", "category": "Коктейли", "ingredients": [{"name": "Beluga Noble Botanicals Pear and Linden", "amount": 30.0}, {"name": "Сироп в асс (имбирь)", "amount": 10.0}, {"name": "Лимонад ПЭТ в асс (тоник)", "amount": 80.0}, {"name": "Сок лимона п/ф", "amount": 10.0}, {"name": "Мята ", "amount": 2.0}], "preparation": "В чистый сухой бокал подачи добавить кусковой лед, используя мерную посуду, добавить все ингредиенты, перемешать барной ложкой и украсить мятой", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": 61.65, "price": 250.0, "note": "Белуга", "source_row": 148},
-  {"id": "r154", "name": "Порн Стар", "category": "Коктейли", "ingredients": [{"name": "Водка хаус", "amount": 40.0}, {"name": "Сироп в асс (ваниль)", "amount": 10.0}, {"name": "Кордиал Маракуйя Лемонграсс", "amount": 30.0}], "preparation": "", "yield": 120.0, "vessel": "Шале", "cost": 54.0, "price": 250.0, "note": "", "source_row": 154},
-  {"id": "r158", "name": "Двойное Яблоко НОВЫЙ", "category": "Коктейли", "ingredients": [{"name": "Виски Джони Волмер Яблочный", "amount": 40.0}, {"name": "Сок Яблока ", "amount": 40.0}, {"name": "Сок лимона пф ", "amount": 10.0}, {"name": "Сироп Ваниль", "amount": 10.0}], "preparation": "В чистый сухой бокал подачи добавить кусковой лед, используя мерную посуду, добавить все ингредиенты, перемешать барной ложкой и украсить мятой", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 158},
-  {"id": "r164", "name": "Охотник желает знать", "category": "Сеты шотов", "ingredients": [{"name": "Кордиал Ежевика ", "amount": 25.0}, {"name": "Джин хаус", "amount": 30.0}, {"name": "Сок в асс (ананас)", "amount": 40.0}, {"name": "Сок лимона п/ф", "amount": 10.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденные ШОТЫ", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": 250.0, "note": "3 шт ", "source_row": 164},
-  {"id": "r169", "name": "Шот Сет  Легенда Диско", "category": "Сеты шотов", "ingredients": [{"name": "Ром Оакхарт Блек", "amount": 20.0}, {"name": "Кордиал Ежевика ", "amount": 20.0}, {"name": "Сок Лимона пф ", "amount": 10.0}, {"name": "Ликер Трипл сек ", "amount": 10.0}, {"name": "Сок Ананас ", "amount": 40.0}], "preparation": "", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": null, "note": "", "source_row": 169},
-  {"id": "r175", "name": "Шот Сет Соседка", "category": "Сеты шотов", "ingredients": [{"name": "Кордиал Личи Персик ", "amount": 30.0}, {"name": "Текила хаус", "amount": 30.0}, {"name": "Сироп Имбирь ", "amount": 10.0}, {"name": "Сок Ананас", "amount": 20.0}, {"name": "Сок лимона пф ", "amount": 20.0}], "preparation": "", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": null, "note": "3 шт ", "source_row": 175},
-  {"id": "r181", "name": "Тропикана ( ТРУ КОСТ )", "category": "Сеты шотов", "ingredients": [{"name": "Водка хаус ", "amount": 30.0}, {"name": "Кордиал Маракуйя Лемонграсс", "amount": 30.0}, {"name": "Сок Ананас", "amount": 50.0}], "preparation": "Взять шейкер, налить все ингредиенты, засыпать льдом, хорошо шейкануть, зазлить по чистым шотам ", "yield": 120.0, "vessel": "Шот х 3", "cost": null, "price": 250.0, "note": "3 шт ", "source_row": 181},
-  {"id": "r185", "name": "Баблгам", "category": "Сеты шотов", "ingredients": [{"name": "Водка хаус", "amount": 30.0}, {"name": "Сироп в асс (баблгам)", "amount": 20.0}, {"name": "Сок лимона п/ф", "amount": 10.0}, {"name": "Сок в асс (грейпфрут)", "amount": 40.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденные ШОТЫ", "yield": 120.0, "vessel": "Шот х 3", "cost": 51.03, "price": 250.0, "note": "3 шт ", "source_row": 185},
-  {"id": "r190", "name": "Гуляй, студент, гуляй ( ТРУ КОСТ  )", "category": "Сеты шотов", "ingredients": [{"name": "Водка хаус", "amount": 40.0}, {"name": "Сироп в асс (блю кюрасао)", "amount": 20.0}, {"name": "Сок в асс", "amount": 40.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденные ШОТЫ", "yield": 120.0, "vessel": "Шот х 3", "cost": 56.93, "price": 250.0, "note": "3 шт ", "source_row": 190},
-  {"id": "r194", "name": "Седая ночь ( ТРУ КОСТ  )", "category": "Сеты шотов", "ingredients": [{"name": "Водка хаус", "amount": 40.0}, {"name": "Ликер в асс (сливочный)", "amount": 10.0}, {"name": "Сок в асс (ананас)", "amount": 40.0}, {"name": "Сироп в асс (кокос)", "amount": 10.0}, {"name": "Сироп в асс (карамель)", "amount": 10.0}], "preparation": "Взять шейкер, насыпать кусковой лед, налить все ингредиенты в шейкер при помощи джигера, сделать шейк 8 сек, дабл стрейн в ЗАРАНЕЕ охлажденные ШОТЫ", "yield": 120.0, "vessel": "Шот х 3", "cost": null, "price": 250.0, "note": "3 шт ", "source_row": 194},
-  {"id": "r200", "name": "Апельсиновый Рай", "category": "Сеты шотов", "ingredients": [{"name": "Кордиал Апельсин Ройбуш ", "amount": 30.0}, {"name": "Джин Босфор ", "amount": 40.0}, {"name": "Сок Грейфрут ", "amount": 30.0}], "preparation": "", "yield": 120.0, "vessel": "Шот х3", "cost": null, "price": 250.0, "note": "3 шт ", "source_row": 200},
-  {"id": "r204", "name": "Чужие Губы", "category": "Сеты шотов", "ingredients": [{"name": "Кордиал Клубника Базилик ", "amount": 20.0}, {"name": "Водка Хаус ", "amount": 40.0}, {"name": "Морс ", "amount": 30.0}, {"name": "Лимонный сок пф", "amount": 10.0}], "preparation": "", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": null, "note": "", "source_row": 204},
-  {"id": "r209", "name": "Горько", "category": "Сеты шотов", "ingredients": [{"name": "Кордиал Грепфрут Жасмин ", "amount": 20.0}, {"name": "Водка", "amount": 40.0}, {"name": "Сок ", "amount": 30.0}, {"name": "Лимонный сок пф", "amount": 10.0}], "preparation": "", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": null, "note": "", "source_row": 209},
-  {"id": "r214", "name": "Холодно", "category": "Сеты шотов", "ingredients": [{"name": "Сливки 11%", "amount": 20.0}, {"name": "Сироп в асс ( мята )", "amount": 20.0}, {"name": "Водка хаус ", "amount": 40.0}, {"name": "Сок Перски ", "amount": 30.0}], "preparation": "", "yield": 120.0, "vessel": "шот х 3", "cost": null, "price": null, "note": "", "source_row": 214},
-  {"id": "r220", "name": "Черная Ягодный микс ( НОВИНКА )", "category": "Чайники", "ingredients": [{"name": "Кордиал Ежевика ", "amount": 40.0}, {"name": "Чай Ассам", "amount": 5.0}, {"name": "Морс Ягодный ", "amount": 60.0}, {"name": "Лимонный сок п\\ф", "amount": 10.0}], "preparation": "Переработка ТТК и Смена названия ", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 220},
-  {"id": "r225", "name": "Малина Маракуйя  ( Новинка )", "category": "Чайники", "ingredients": [{"name": "Чай Зеленый Сенча ", "amount": 4.0}, {"name": "Сироп в асс ( малина)", "amount": 30.0}, {"name": "Кордила Маракуйя Лемонграсс ", "amount": 30.0}, {"name": "Морс Ягодный ", "amount": 80.0}], "preparation": "", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 225},
-  {"id": "r230", "name": "Яблоко Корица ( Новинка )", "category": "Чайники", "ingredients": [{"name": "Чай Черный Ассам  ", "amount": 4.0}, {"name": "Сок Яблочный ", "amount": 100.0}, {"name": "Корица Палочка", "amount": 3.0}], "preparation": "", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 230},
-  {"id": "r234", "name": "Тропический Чай", "category": "Чайники", "ingredients": [{"name": "Кордиал Маракуйя Лемонграсс", "amount": 50.0}, {"name": "Лимонный сок п\\ф", "amount": 10.0}, {"name": "Чай Молочный улун ", "amount": 5.0}], "preparation": "", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 234},
-  {"id": "r238", "name": "Персик Клубника", "category": "Чайники", "ingredients": [{"name": "Сок Персик ", "amount": 100.0}, {"name": "Чай Каркаде ", "amount": 5.0}, {"name": "Сироп клубника", "amount": 30.0}], "preparation": "", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 238},
-  {"id": "r242", "name": "Грейпфрут Имбирь", "category": "Чайники", "ingredients": [{"name": "Сок Грейфрут ", "amount": 100.0}, {"name": "Чай Сенча", "amount": 5.0}, {"name": "Сироп Имбирь ", "amount": 30.0}, {"name": "Лимонный сок п\\ф", "amount": 20.0}], "preparation": "", "yield": 400.0, "vessel": "Чайник", "cost": null, "price": null, "note": "", "source_row": 242},
-  {"id": "r248", "name": "Ежевика Грейпфрут", "category": "Лимонады", "ingredients": [{"name": "Кордиал Ежевика ", "amount": 30.0}, {"name": "Сок Грейфрут ", "amount": 30.0}, {"name": "Вода ПЭТ газ", "amount": 60.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 248},
-  {"id": "r253", "name": "Персик Клубника", "category": "Лимонады", "ingredients": [{"name": "Сок Перскик", "amount": 40.0}, {"name": "Сироп Клубника", "amount": 30.0}, {"name": "Содовая ", "amount": 100.0}, {"name": "Лимонный сок п\\ф ", "amount": 10.0}, {"name": "Лимон ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 253},
-  {"id": "r259", "name": "Цитрусовый", "category": "Лимонады", "ingredients": [{"name": "Сок Грейфрут ", "amount": 40.0}, {"name": "Лимонный сок п\\ф", "amount": 20.0}, {"name": "Содовая ", "amount": 100.0}, {"name": "Кордиал Апельсин Ройбуш ", "amount": 10.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 259},
-  {"id": "r265", "name": "Вишня Гранат", "category": "Лимонады", "ingredients": [{"name": "Сок вишня", "amount": 60.0}, {"name": "Лимонный сок п\\ф", "amount": 20.0}, {"name": "Содовая ", "amount": 100.0}, {"name": "Сироп Гренадин", "amount": 20.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 265},
-  {"id": "r271", "name": "Яблоко Кокос", "category": "Лимонады", "ingredients": [{"name": "Сок Яблочный ", "amount": 60.0}, {"name": "Лимонный сок п\\ф", "amount": 20.0}, {"name": "Содовая ", "amount": 100.0}, {"name": "Сироп Кокос ", "amount": 20.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 271},
-  {"id": "r277", "name": "Малина Маракуйя  ( Новинка )", "category": "Лимонады", "ingredients": [{"name": "Кордиал Маракуйя Лемонграсс", "amount": 20.0}, {"name": "Лимонный сок п\\ф", "amount": 20.0}, {"name": "Содовая ", "amount": 100.0}, {"name": "Сироп Малина", "amount": 20.0}, {"name": "Апельсин ", "amount": 10.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 277},
-  {"id": "r283", "name": "Мохито б/а ДС", "category": "Лимонады", "ingredients": [{"name": "Лайм", "amount": 30.0}, {"name": "Мята", "amount": 10.0}, {"name": "Сахарный сироп п/ф", "amount": 30.0}, {"name": "Вода газ ПЭТ", "amount": 100.0}], "preparation": "", "yield": 250.0, "vessel": "Граненный стакан 250 мл  ", "cost": null, "price": null, "note": "", "source_row": 283}
-];
+let db = {
+  recipes: [
+    {"id": "r4", "name": "Лимончелло", "category": "Настойки", "ingredients": [{"name": "Лимончелло  п/ф", "amount": 40.0}], "preparation": "", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 16.81, "price": 250.0, "note": "", "source_row": 4},
+    {"id": "r6", "name": "Клюквенная", "category": "Настойки", "ingredients": [{"name": "Клюквенная настойка п/ф", "amount": 40.0}], "preparation": "", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 29.14, "price": 250.0, "note": "", "source_row": 6},
+    {"id": "r9", "name": "Боярский", "category": "Шоты", "ingredients": [{"name": "Водка хаус", "amount": 30.0}, {"name": "Сироп в асс (гренадин)", "amount": 10.0}, {"name": "Табаско", "amount": 2.0}], "preparation": "Взять чистый сухой шот, налить слоями по барной ложке, сначала Сироп гренадин, затем водку, в конце добавить тобаско 2 капли.\nМетод: Лейринг", "yield": 40.0, "vessel": "Стопка «Бостон шот» 40мл", "cost": 36.18, "price": 250.0, "note": "", "source_row": 9}
+  ],
+  staff: []
+};
 
-// Состояние приложения
-let recipes = JSON.parse(localStorage.getItem('bar_recipes_v2')) || JSON.parse(JSON.stringify(defaultRecipes));
-let currentRole = localStorage.getItem('bar_role_v2') || 'bartender';
+let currentUser = { name: "Бармен", role: "bartender" };
 let active = 'Все', query = '', currentDetailId = null;
-
 const $ = id => document.getElementById(id);
 
-function saveRecipes() {
-  localStorage.setItem('bar_recipes_v2', JSON.stringify(recipes));
+// Загрузка данных из облака
+async function loadFromCloud() {
+  try {
+    const res = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+      headers: { "X-Master-Key": API_KEY }
+    });
+    const data = await res.json();
+    if (data.record && data.record.recipes) {
+      db = data.record;
+      if (!db.staff) db.staff = [];
+      $('syncStatus').textContent = "☁ Облачная база загружена";
+      updateStaffSelect();
+      drawFilters();
+      drawList();
+    }
+  } catch (e) {
+    $('syncStatus').textContent = "⚠ Ошибка загрузки из облака";
+    drawFilters();
+    drawList();
+  }
 }
 
-function setRole(role) {
-  currentRole = role;
-  localStorage.setItem('bar_role_v2', role);
+// Сохранение в облако
+async function saveToCloud() {
+  $('syncStatus').textContent = "☁ Сохранение...";
+  try {
+    await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": API_KEY
+      },
+      body: JSON.stringify(db)
+    });
+    $('syncStatus').textContent = "☁ Изменения сохранены в облаке";
+  } catch (e) {
+    $('syncStatus').textContent = "⚠ Ошибка сохранения в облако";
+  }
+}
+
+function updateStaffSelect() {
+  const select = $('userSelect');
+  let html = `<option value="manager">Управляющий (Master PIN)</option>`;
+  db.staff.forEach(s => {
+    html += `<option value="${s.name}">${s.name} (Бармен)</option>`;
+  });
+  select.innerHTML = html;
   
-  if (role === 'manager') {
-    document.body.classList.add('is-manager');
-    $('roleLabel').textContent = 'Управляющий';
-    $('roleIndicator').style.color = '#a3b889';
-    $('selectManager').classList.add('active-role');
-    $('selectBartender').classList.remove('active-role');
+  let staffHtml = '';
+  db.staff.forEach((s, idx) => {
+    staffHtml += `<div class="staff-row"><span><b>${s.name}</b> (PIN: ${s.pin})</span> <button class="btn btn-danger" style="padding:4px 8px;font-size:10px;" onclick="removeStaff(${idx})">Удалить</button></div>`;
+  });
+  $('staffList').innerHTML = staffHtml || '<div class="tiny" style="color:var(--muted)">Нет добавленных барменов</div>';
+}
+
+window.removeStaff = async idx => {
+  if (confirm('Удалить этого бармена?')) {
+    db.staff.splice(idx, 1);
+    await saveToCloud();
+    updateStaffSelect();
+  }
+};
+
+$('addStaffBtn').onclick = async () => {
+  const name = $('newStaffName').value.trim();
+  const pin = $('newStaffPin').value.trim();
+  if(!name || !pin) return alert('Введите имя и PIN бармена');
+  db.staff.push({ name, pin });
+  await saveToCloud();
+  $('newStaffName').value = '';
+  $('newStaffPin').value = '';
+  updateStaffSelect();
+  alert('Бармен успешно добавлен!');
+};
+
+$('loginBtn').onclick = () => {
+  const user = $('userSelect').value;
+  const pin = $('loginPin').value;
+  
+  if (user === 'manager') {
+    if (pin === MANAGER_PIN) {
+      currentUser = { name: "Управляющий", role: "manager" };
+      document.body.classList.add('is-manager');
+      $('roleLabel').textContent = 'Управляющий';
+      $('roleIndicator').style.color = '#a3b889';
+      $('authModal').classList.remove('show');
+    } else {
+      alert('Неверный PIN управляющего');
+    }
   } else {
-    document.body.classList.remove('is-manager');
-    $('roleLabel').textContent = 'Бармен';
-    $('roleIndicator').style.color = '#aab4a8';
-    $('selectBartender').classList.add('active-role');
-    $('selectManager').classList.remove('active-role');
+    const staffMember = db.staff.find(s => s.name === user);
+    if (staffMember && staffMember.pin === pin) {
+      currentUser = { name: staffMember.name, role: "bartender" };
+      document.body.classList.remove('is-manager');
+      $('roleLabel').textContent = staffMember.name;
+      $('roleIndicator').style.color = '#aab4a8';
+      $('authModal').classList.remove('show');
+    } else {
+      alert('Неверный PIN бармена');
+    }
   }
-  
-  if (currentDetailId && $('detail').classList.contains('show')) {
-    openRecipe(currentDetailId);
-  }
-}
+  $('loginPin').value = '';
+  if (currentDetailId) openRecipe(currentDetailId);
+  drawList();
+};
 
-// Логика окна авторизации
 function openAuthModal() {
   $('authModal').classList.add('show');
-  $('pinBox').classList.remove('show');
-  $('pinError').style.display = 'none';
-  $('pinInput').value = '';
+  updateStaffSelect();
 }
 
 $('openAuthBtn').onclick = openAuthModal;
 $('navAuth').onclick = openAuthModal;
 $('closeAuthBtn').onclick = () => $('authModal').classList.remove('show');
 
-$('selectBartender').onclick = () => {
-  setRole('bartender');
-  $('authModal').classList.remove('show');
-};
-
-$('selectManager').onclick = () => {
-  if (currentRole === 'manager') {
-    $('authModal').classList.remove('show');
-    return;
-  }
-  $('pinBox').classList.add('show');
-  $('pinInput').focus();
-};
-
-$('confirmPinBtn').onclick = () => {
-  if ($('pinInput').value === MANAGER_PIN) {
-    setRole('manager');
-    $('authModal').classList.remove('show');
-  } else {
-    $('pinError').style.display = 'block';
-    $('pinInput').value = '';
-    $('pinInput').focus();
-  }
-};
-
-$('pinInput').addEventListener('keypress', e => {
-  if (e.key === 'Enter') $('confirmPinBtn').click();
-});
-
-$('resetDataBtn').onclick = () => {
-  if (confirm('Вернуть все рецепты к изначальному виду? Все добавленные вами позиции удалятся.')) {
-    recipes = JSON.parse(JSON.stringify(defaultRecipes));
-    saveRecipes();
-    drawFilters();
-    drawList();
-    if (currentDetailId) {
-      $('back').click();
-    }
-    $('authModal').classList.remove('show');
-  }
-};
-
 // Отрисовка каталога и карточек
 function fmt(v){return v===null||v===undefined||v===''?'—':String(v).replace('.',',')}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-function getCats(){return ['Все',...new Set(recipes.map(r=>r.category))]}
+function getCats(){return ['Все',...new Set(db.recipes.map(r=>r.category))]}
 
 function filtered(){
-  return recipes.filter(r => 
+  return db.recipes.filter(r => 
     (active === 'Все' || r.category === active) && 
     (!query || [r.name, r.category, r.note, ...r.ingredients.map(i => i.name)].join(' ').toLowerCase().includes(query.toLowerCase()))
   );
@@ -399,7 +383,7 @@ function drawList(){
       <div class="monogram">${esc(r.name.trim().slice(0,1).toUpperCase())}</div>
       <div class="recipe-main">
         <div class="recipe-name">${esc(r.name)}</div>
-        <div class="recipe-meta">${esc(r.category)} · ${r.ingredients.length} ингредиент(ов)</div>
+        <div class="recipe-meta">${esc(r.category)} · ${r.ingredients.length} ингр.</div>
       </div>
       <div class="arrow">›</div>
     </button>
@@ -409,7 +393,7 @@ function drawList(){
 }
 
 function openRecipe(id){
-  const r = recipes.find(x => x.id === id);
+  const r = db.recipes.find(x => x.id === id);
   if(!r) return;
   currentDetailId = id;
   $('catalog').classList.add('hide');
@@ -420,25 +404,28 @@ function openRecipe(id){
   const ingredientsHtml = () => r.ingredients.map(i => `
     <div class="ingredient">
       <span>${esc(i.name)}</span>
-      <span class="amount">${fmt(Number(i.amount)*mult)} <small class="tiny">по данным ТТК</small></span>
+      <span class="amount">${fmt(Number(i.amount)*mult)} <small class="tiny">мл/г</small></span>
     </div>
   `).join('');
+
+  const isMgr = currentUser.role === 'manager';
 
   $('detailBody').innerHTML = `
     <div class="hero">
       <div class="tag">${esc(r.category)} · ТЕХНОЛОГИЧЕСКАЯ КАРТА</div>
       <h1>${esc(r.name)}</h1>
-      <p>${r.source_row ? `Исходная рецептура из Excel · строка ${r.source_row}` : 'Добавлено управляющим'}</p>
+      <p>Сотрудник на смене: ${currentUser.name}</p>
       <div class="stats">
-        <div class="stat">Выход: ${fmt(r.yield)}</div>
-        <div class="stat">Цена: ${r.price===null?'—':fmt(r.price)}</div>
+        <div class="stat">Выход: ${fmt(r.yield)} мл</div>
+        <div class="stat">Цена: ${r.price===null?'—':fmt(r.price)} ₽</div>
       </div>
     </div>
     
+    ${isMgr ? `
     <div class="manager-only" style="margin-bottom: 12px; gap: 8px;">
       <button class="btn btn-outline" id="editRecipeBtn" style="flex:1;">✎ Редактировать</button>
       <button class="btn btn-danger" id="delRecipeBtn" style="flex:1;">✕ Удалить</button>
-    </div>
+    </div>` : ''}
 
     <div class="panel"><h3>Состав</h3><div id="ings">${ingredientsHtml()}</div></div>
     <div class="panel">
@@ -446,22 +433,24 @@ function openRecipe(id){
         <h3 style="margin:0">Пересчёт порций</h3>
         <div class="calc"><span class="tiny">×</span><input id="mult" type="number" min="1" max="99" value="1"></div>
       </div>
-      <div class="tiny" style="margin-top:8px">Количество каждого ингредиента пересчитывается относительно исходной карты.</div>
+      <div class="tiny" style="margin-top:8px">Количество каждого ингредиента пересчитывается автоматически.</div>
     </div>
-    <div class="panel"><h3>Приготовление</h3>${r.preparation ? `<div class="step">${esc(r.preparation)}</div>` : '<div class="muted">В исходной таблице способ приготовления не указан.</div>'}</div>
-    <div class="panel"><h3>Подача и примечания</h3><div class="muted">Посуда: ${esc(r.vessel||'не указана в строке рецепта')}<br>Примечание: ${esc(r.note||'—')}<br>Себестоимость: ${r.cost===null?'не указана':fmt(r.cost)}<br>Отпускная цена: ${r.price===null?'не указана':fmt(r.price)}</div></div>
+    <div class="panel"><h3>Приготовление</h3>${r.preparation ? `<div class="step">${esc(r.preparation)}</div>` : '<div class="muted">Способ приготовления не указан.</div>'}</div>
+    <div class="panel"><h3>Подача и примечания</h3><div class="muted">Посуда: ${esc(r.vessel||'—')}<br>Примечание: ${esc(r.note||'—')}<br>Себестоимость: ${r.cost===null?'не указана':fmt(r.cost)} ₽<br>Отпускная цена: ${r.price===null?'не указана':fmt(r.price)} ₽</div></div>
   `;
 
-  $('editRecipeBtn').onclick = () => openModal(r);
-  $('delRecipeBtn').onclick = () => {
-    if(confirm(`Удалить техкарту "${r.name}"?`)){
-      recipes = recipes.filter(x => x.id !== id);
-      saveRecipes();
-      $('back').click();
-      drawFilters();
-      drawList();
-    }
-  };
+  if(isMgr) {
+    $('editRecipeBtn').onclick = () => openModal(r);
+    $('delRecipeBtn').onclick = async () => {
+      if(confirm(`Удалить техкарту "${r.name}"?`)){
+        db.recipes = db.recipes.filter(x => x.id !== id);
+        await saveToCloud();
+        $('back').click();
+        drawFilters();
+        drawList();
+      }
+    };
+  }
 
   $('mult').oninput = e => {
     let n = Math.max(1, Math.min(99, Number(e.target.value) || 1));
@@ -500,7 +489,7 @@ function openModal(recipe = null) {
     $('fName').value = recipe.name;
     $('fCategory').value = recipe.category;
     $('fPrep').value = recipe.preparation || '';
-    $('fYield').value = recipe.yield || '';
+    $('fYield').value = recipe.yield || 250;
     $('fPrice').value = recipe.price !== null ? recipe.price : '';
     $('fVessel').value = recipe.vessel || '';
     $('fCost').value = recipe.cost !== null ? recipe.cost : '';
@@ -517,7 +506,7 @@ function openModal(recipe = null) {
 $('addBtn').onclick = () => openModal();
 $('closeModal').onclick = () => modal.classList.remove('show');
 
-$('recipeForm').onsubmit = e => {
+$('recipeForm').onsubmit = async e => {
   e.preventDefault();
   const id = $('editId').value;
   
@@ -527,8 +516,6 @@ $('recipeForm').onsubmit = e => {
     const amount = parseFloat(row.querySelector('.ing-amount').value) || 0;
     if(name) ingredients.push({ name, amount });
   });
-
-  const existing = id ? recipes.find(x => x.id === id) : null;
 
   const recipeData = {
     id: id || 'r_' + Date.now(),
@@ -540,18 +527,17 @@ $('recipeForm').onsubmit = e => {
     price: $('fPrice').value !== '' ? parseFloat($('fPrice').value) : null,
     vessel: $('fVessel').value.trim(),
     cost: $('fCost').value !== '' ? parseFloat($('fCost').value) : null,
-    note: $('fNote').value.trim(),
-    source_row: existing ? existing.source_row : null
+    note: $('fNote').value.trim()
   };
 
   if(id) {
-    const idx = recipes.findIndex(x => x.id === id);
-    if(idx !== -1) recipes[idx] = recipeData;
+    const idx = db.recipes.findIndex(x => x.id === id);
+    if(idx !== -1) db.recipes[idx] = recipeData;
   } else {
-    recipes.unshift(recipeData);
+    db.recipes.unshift(recipeData);
   }
 
-  saveRecipes();
+  await saveToCloud();
   modal.classList.remove('show');
   drawFilters();
   drawList();
@@ -581,8 +567,8 @@ $('navSearch').onclick = () => {
 };
 $('q').addEventListener('input', e => { query = e.target.value; drawList(); });
 
-// Инициализация
-setRole(currentRole);
+// Инициализация при старте
+loadFromCloud();
 drawFilters();
 drawList();
 </script>
