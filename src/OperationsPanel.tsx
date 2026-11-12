@@ -49,6 +49,7 @@ export function OperationsPanel({tab,staff,manager,profile,onProfileChange,onMes
   if(error){report(error.message);return}
   let id=s?.id as string|undefined
   if(!id){const {data:created,error:ce}=await supabase.from('shift_sessions').insert({opened_by:staff.id}).select('id').single();if(ce){report(ce.message);return}id=created.id}
+  if(!id){report('Не удалось открыть смену');return}
   setSessionId(id)
   const [{data:i,error:ie},{data:c,error:ce}]=await Promise.all([supabase.from('shift_checklist_items').select('id,title,description,sort_order').eq('active',true).order('sort_order'),supabase.from('shift_checks').select('*').eq('shift_session_id',id)])
   if(ie||ce){report((ie||ce)!.message);return}
