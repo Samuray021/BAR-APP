@@ -40,12 +40,12 @@ export function RecipeQuiz({ recipes, loading, loadError, onReload, onOpenRecipe
   }
 
   return <div className="quiz-page">
-    <div className="page-heading"><div><h1>Тест</h1><p>Проверь знание барного меню.</p></div></div>
+    <div className="page-heading"><div><h1>Тест</h1><p>Проверь, помнишь ли ты состав и количество ингредиентов.</p></div></div>
     {complete ? <section className="quiz-card">
       <h2>Результат</h2>
       <p role="status">Правильных ответов: <strong>{questions.length - mistakes.length} из {questions.length}</strong></p>
       {!!mistakes.length && <ul className="quiz-review">
-        {mistakes.map(item => <li key={item.recipe.id}>
+        {mistakes.map(item => <li key={JSON.stringify([item.recipe.id, item.prompt])}>
           <button className="quiz-link" onClick={() => onOpenRecipe(item.recipe)}>{item.recipe.name}</button>
           <span>{item.prompt} <strong>{item.answer}</strong></span>
         </li>)}
