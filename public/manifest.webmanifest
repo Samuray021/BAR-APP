@@ -2,13 +2,13 @@
   "name": "BAR ASSIST",
   "short_name": "BAR ASSIST",
   "description": "Современная система управления баром",
-  "start_url": "/BAR-APP/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#202622",
   "theme_color": "#202622",
   "icons": [
     {
-      "src": "/BAR-APP/icon.svg",
+      "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"

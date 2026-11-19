@@ -4,10 +4,14 @@ import type { Session } from '@supabase/supabase-js'
 import { supabase } from './lib/supabase'
 import type { Recipe, Staff, Ingredient } from './types'
 import { OperationsPanel } from './OperationsPanel'
+import { RecipeQuiz } from './RecipeQuiz'
 
-type Tab = 'recipes' | 'schedule' | 'team' | 'settings'
+const iconUrl = import.meta.env.BASE_URL + 'icon.svg'
+
+type Tab = 'recipes' | 'quiz' | 'schedule' | 'team' | 'settings'
 const nav: { id: Tab; title: string; icon: string }[] = [
   { id: 'recipes', title: 'Техкарты', icon: '◈' },
+  { id: 'quiz', title: 'Тест', icon: '✓' },
   { id: 'schedule', title: 'График', icon: '▦' },
   { id: 'team', title: 'Команда', icon: '♙' },
   { id: 'settings', title: 'Настройки', icon: '⚙' },
@@ -25,7 +29,8 @@ export default function App() {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [recipes, setRecipes] = useState<Recipe[]>([])
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [recipeLoadError, setRecipeLoadError] = useState('')
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('Все')
   const [tab, setTab] = useState<Tab>('recipes')
@@ -51,8 +56,12 @@ export default function App() {
   }, [])
   const loadRecipes = useCallback(async () => {
     setLoading(true)
+    setRecipeLoadError('')
     const { data, error } = await supabase.from('recipes').select('*').order('name')
-    if (error) setMessage(error.message)
+    if (error) {
+      setRecipeLoadError(error.message)
+      setMessage(error.message)
+    }
     else setRecipes((data ?? []) as Recipe[])
     setLoading(false)
   }, [])
@@ -163,28 +172,30 @@ export default function App() {
     finally { setSaving(false) }
   }
 
-  if (splashVisible) return <div className="studio-splash"><div className="splash-grain"/><div className="splash-content"><div className="splash-emblem"><img src="/BAR-APP/icon.svg" alt="BAR ASSIST"/></div><div className="studio-name">studio Samuray_021</div><div className="splash-rule"/><div className="splash-brand">BAR ASSIST</div><div className="splash-caption">BAR MANAGEMENT SYSTEM</div></div><div className="splash-bottom">CRAFTED FOR THE BAR</div></div>
-  if (starting) return <div className="boot"><img className="brand-image boot-logo" src="/BAR-APP/icon.svg" alt="BAR ASSIST"/><p>Подготовка BAR ASSIST…</p></div>
+  if (splashVisible) return <div className="studio-splash"><div className="splash-grain"/><div className="splash-content"><div className="splash-emblem"><img src={iconUrl} alt="BAR ASSIST"/></div><div className="studio-name">studio Samuray_021</div><div className="splash-rule"/><div className="splash-brand">BAR ASSIST</div><div className="splash-caption">BAR MANAGEMENT SYSTEM</div></div><div className="splash-bottom">CRAFTED FOR THE BAR</div></div>
+  if (starting) return <div className="boot"><img className="brand-image boot-logo" src={iconUrl} alt="BAR ASSIST"/><p>Подготовка BAR ASSIST…</p></div>
   if (!session || !staff) return <main className="login-screen"><div className="login-card">
-    <div className="brand-lockup"><img className="brand-image" src="/BAR-APP/icon.svg" alt="BAR ASSIST"/><div><strong>BAR ASSIST</strong><small>РАБОЧЕЕ ПРОСТРАНСТВО БАРА</small></div></div>
+    <div className="brand-lockup"><img className="brand-image" src={iconUrl} alt="BAR ASSIST"/><div><strong>BAR ASSIST</strong><small>РАБОЧЕЕ ПРОСТРАНСТВО БАРА</small></div></div>
     <div className="login-copy"><span className="eyebrow">СИСТЕМА УПРАВЛЕНИЯ</span><h1>Работа бара.<br/><em>Без хаоса.</em></h1><p>Техкарты, команда и процессы смены — в одном месте.</p></div>
     <form className="login-form" onSubmit={signIn}><label>Логин<input autoComplete="username" value={username} onChange={e => setUsername(e.target.value)} placeholder="Введите логин"/></label><label>Пароль<input type="password" autoComplete="current-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Введите пароль"/></label>{error && <div className="error">{error}</div>}<button className="primary-btn" disabled={busy}>{busy ? 'Входим…' : 'Войти в приложение'}</button></form>
     <div className="login-foot">ДОСТУП ТОЛЬКО ДЛЯ СОТРУДНИКОВ</div>
   </div></main>
 
   return <div className={'app-shell theme-' + profile.color_mode + ' accent-' + profile.theme}>
-    <header className="topbar"><div className="brand-lockup compact"><img className="brand-image" src="/BAR-APP/icon.svg" alt="BAR ASSIST"/><div><strong>BAR ASSIST</strong><small>by studio Samuray_021</small></div></div><div className="user-area"><div className="user-avatar">{staff.name.slice(0,1).toUpperCase()}</div><div className="user-meta"><b>{staff.name}</b><small>{manager ? 'Управляющий' : 'Сотрудник'}</small></div><button className="icon-btn" onClick={signOut} aria-label="Выйти">↗</button></div></header>
-    <main className="workspace"><aside className="sidebar"><div className="side-label">РАЗДЕЛЫ</div>{nav.map(n => <button key={n.id} className={'nav-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span>{n.title}{n.id === 'recipes' && <small>{recipes.length}</small>}</button>)}<div className="sidebar-bottom"><span className="status-dot"/> База данных подключена</div></aside>
+    <header className="topbar"><div className="brand-lockup compact"><img className="brand-image" src={iconUrl} alt="BAR ASSIST"/><div><strong>BAR ASSIST</strong><small>by studio Samuray_021</small></div></div><div className="user-area"><div className="user-avatar">{staff.name.slice(0,1).toUpperCase()}</div><div className="user-meta"><b>{staff.name}</b><small>{manager ? 'Управляющий' : 'Сотрудник'}</small></div><button className="icon-btn" onClick={signOut} aria-label="Выйти">↗</button></div></header>
+    <main className="workspace"><aside className="sidebar"><div className="side-label">РАЗДЕЛЫ</div>{nav.map(n => <button key={n.id} className={'nav-item ' + (tab === n.id ? 'active' : '')} aria-current={tab === n.id ? 'page' : undefined} onClick={() => setTab(n.id)}><span>{n.icon}</span>{n.title}{n.id === 'recipes' && <small>{recipes.length}</small>}</button>)}</aside>
       <section className="content">{tab === 'recipes' ? <>
-        <div className="page-heading"><div><span className="eyebrow">БАЗА БАРА / РЕЦЕПТУРЫ</span><h1>Технологические карты</h1><p>Единый стандарт приготовления и подачи.</p></div>{manager && <button className="primary-btn add-btn" onClick={createRecipe}>＋ Новая техкарта</button>}</div>
+        <div className="page-heading"><div><h1>Технологические карты</h1></div>{manager && <button className="primary-btn add-btn" onClick={createRecipe}>＋ Новая техкарта</button>}</div>
         <div className="stats-row"><div className="stat-card"><small>ВСЕГО ПОЗИЦИЙ</small><strong>{recipes.length}</strong></div><div className="stat-card"><small>КАТЕГОРИЙ</small><strong>{categories.length - 1}</strong></div><div className="stat-card"><small>РЕЗУЛЬТАТЫ</small><strong>{shown.length}</strong></div></div>
         <div className="toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Поиск по названию или ингредиенту"/></div><button className="subtle-btn" onClick={() => { setQuery(''); setCategory('Все'); void loadRecipes() }}>↻ Обновить</button></div>
         <div className="category-row">{categories.map(c => <button key={c} className={'category-chip ' + (category === c ? 'chosen' : '')} onClick={() => setCategory(c)}>{c}</button>)}</div>
         {message && <div className="notice">{message}<button onClick={() => setMessage('')}>×</button></div>}
         {loading ? <div className="empty-state">Загружаем техкарты…</div> : shown.length ? <div className="recipe-grid">{shown.map(r => <button className="recipe-card" key={r.id} onClick={() => setSelected(r)}><div className="recipe-card-top"><span className="recipe-category">{r.category}</span><span className="card-arrow">↗</span></div><h3>{r.name}</h3><p>{(r.ingredients ?? []).slice(0,3).map(i => i.name).join(' · ') || 'Состав не указан'}</p><div className="recipe-card-foot"><span>{r.yield ? 'Выход ' + r.yield + ' мл' : 'Технологическая карта'}</span><b>{r.price ? r.price + ' ₽' : 'Подробнее'}</b></div></button>)}</div> : <div className="empty-state"><b>Ничего не найдено</b><span>Измените запрос или категорию.</span></div>}
-      </> : <OperationsPanel tab={tab} staff={staff} manager={manager} profile={profile} onProfileChange={setProfile} onMessage={setMessage} />}</section>
+      </> : tab !== 'quiz' && <OperationsPanel tab={tab} staff={staff} manager={manager} profile={profile} onProfileChange={setProfile} onMessage={setMessage} />}
+        <div hidden={tab !== 'quiz'}><RecipeQuiz recipes={recipes} loading={loading} loadError={recipeLoadError} onReload={loadRecipes} onOpenRecipe={setSelected}/></div>
+      </section>
     </main>
-    <nav className="mobile-nav">{nav.map(n => <button key={n.id} className={'mobile-item ' + (tab === n.id ? 'active' : '')} onClick={() => setTab(n.id)}><span>{n.icon}</span><small>{n.title}</small></button>)}</nav>
+    <nav className="mobile-nav">{nav.map(n => <button key={n.id} className={'mobile-item ' + (tab === n.id ? 'active' : '')} aria-current={tab === n.id ? 'page' : undefined} onClick={() => setTab(n.id)}><span>{n.icon}</span><small>{n.title}</small></button>)}</nav>
     {selected && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setSelected(null) }}><section className="detail-panel"><button className="close-btn" onClick={() => setSelected(null)}>×</button><span className="eyebrow">{selected.category}</span><h2>{selected.name}</h2><div className="detail-metrics"><div><small>ВЫХОД</small><b>{selected.yield || '—'} {selected.yield ? 'мл' : ''}</b></div><div><small>ПОСУДА</small><b>{selected.vessel || '—'}</b></div><div><small>ЦЕНА</small><b>{selected.price ? selected.price + ' ₽' : '—'}</b></div></div><h3>Ингредиенты</h3><div className="ingredient-list">{(selected.ingredients ?? []).map((i, n) => <div key={n}><span>{i.name}</span><b>{i.amount}{i.unit ? ' ' + i.unit : ''}</b></div>)}</div><h3>Приготовление</h3><p className="preparation">{selected.preparation || 'Способ приготовления не указан.'}</p>{selected.note && <div className="note-box">{selected.note}</div>}{manager && <div className="detail-actions"><button className="subtle-btn" onClick={() => editRecipe(selected)}>Редактировать</button></div>}</section></div>}
     {editorOpen && <div className="overlay" onMouseDown={e => { if (e.target === e.currentTarget) setEditorOpen(false) }}><form className="editor-panel" onSubmit={saveRecipe}><button type="button" className="close-btn" onClick={() => setEditorOpen(false)}>×</button><span className="eyebrow">УПРАВЛЕНИЕ РЕЦЕПТУРОЙ</span><h2>{editing ? 'Редактировать техкарту' : 'Новая техкарта'}</h2>
       <label>Название<input required value={draft.name} onChange={e => setDraft({...draft,name:e.target.value})}/></label><label>Категория<input required value={draft.category} onChange={e => setDraft({...draft,category:e.target.value})}/></label><div className="editor-label">Ингредиенты</div>
