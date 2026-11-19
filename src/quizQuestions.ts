@@ -2,9 +2,10 @@ import type { Ingredient, Recipe } from './types'
 
 export type Question = {
   recipe: Recipe
-  prompt: string
   options: string[]
-  answer: string
+  answers: string[]
+  part: number
+  parts: number
 }
 
 function shuffle<T>(values: readonly T[]) {
@@ -17,94 +18,99 @@ function shuffle<T>(values: readonly T[]) {
 }
 
 const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLocaleLowerCase('ru')
-
-function distinct(values: string[], excluded: string[] = []) {
-  const seen = new Set(excluded.map(normalize))
-  return values.map(value => value.trim()).filter(value => {
-    const key = normalize(value)
-    if (!key || seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
-}
-
-function makeQuestion(recipe: Recipe, prompt: string, answer: string, distractors: string[]): Question {
-  return { recipe, prompt, answer, options: shuffle([answer, ...shuffle(distractors).slice(0, 3)]) }
-}
-
 const formatAmount = new Intl.NumberFormat('ru-RU', { maximumSignificantDigits: 15, useGrouping: false })
+const optionCount = 10
+const maxAnswers = optionCount - 1
 
-function amountQuestion(recipe: Recipe, ingredient: Ingredient): Question | undefined {
-  // Older tech cards can include the unit in the amount itself.
-  const match = String(ingredient.amount ?? '').trim().match(/^(\d+(?:[.,]\d+)?|[.,]\d+)\s*([\p{L}][\p{L}.\s]*|%)?$/u)
-  if (!match) return
+function ingredientOption(item: Ingredient) {
+  const name = item.name?.trim() ?? ''
+  const raw = String(item.amount ?? '').trim()
+  const match = raw.match(/^(\d+(?:[.,]\d+)?|[.,]\d+)\s*([\p{L}][\p{L}.\s]*|%)?$/u)
+  const amount = match ? Number(match[1].replace(',', '.')) : NaN
+  const unit = match?.[2]?.trim() || item.unit?.trim() || ''
+  const numeric = Number.isFinite(amount)
+  const measure = numeric ? [formatAmount.format(amount), unit].filter(Boolean).join(' ') : raw
+  return {
+    nameKey: normalize(name),
+    label: name && measure ? `${name} — ${measure}` : '',
+    alternative: (offset: number) => {
+      const next = amount + offset
+      if (!numeric || next <= 0 || !Number.isFinite(next)) return ''
+      return `${name} — ${[formatAmount.format(next), unit].filter(Boolean).join(' ')}`
+    },
+    step: amount >= 20 ? 5 : amount >= 5 ? 1 : 10 ** (Math.floor(Math.log10(amount || 1)) - 1),
+  }
+}
 
-  const amount = Number(match[1].replace(',', '.'))
-  const unit = match[2]?.trim() || ingredient.unit?.trim() || ''
-  if (!Number.isFinite(amount) || amount <= 0) return
-
-  const label = (value: number) => [formatAmount.format(value), unit].filter(Boolean).join(' ')
-  const answer = label(amount)
-  const step = amount >= 20 ? 5 : amount >= 5 ? 1 : 10 ** (Math.floor(Math.log10(amount)) - 1)
-  const distractors = distinct(
-    [-2, -1, 1, 2].map(offset => amount + offset * step).filter(value => value > 0 && Number.isFinite(value)).map(label),
-    [answer],
-  )
-  if (distractors.length < 3) return
-
-  return makeQuestion(recipe, `Сколько нужно ингредиента «${ingredient.name.trim()}»?`, answer, distractors)
+export function isCorrectAnswer(question: Question, selected: readonly string[]) {
+  return selected.length === question.answers.length && question.answers.every(answer => selected.includes(answer))
 }
 
 export function createRecipeQuiz(recipes: Recipe[], category: string | null): Question[] {
-  const ingredients = recipes.flatMap(recipe => (recipe.ingredients ?? []).map(item => item.name))
-  const groups = new Map<string, { composition: Question[]; amount: Question[] }>()
+  const entries = shuffle(recipes).map(recipe => ({
+    recipe,
+    items: (recipe.ingredients ?? []).map(ingredientOption).filter(item => item.nameKey),
+  }))
+  const pool = shuffle(entries.flatMap(entry => entry.items).filter(item => item.label))
+  const groups = new Map<string, Question[][]>()
 
-  for (const recipe of shuffle(recipes)) {
+  for (const { recipe, items } of entries) {
     const recipeCategory = recipe.category || ''
     if (category !== null && category !== recipeCategory) continue
+    if (!items.length || items.some(item => !item.label)) continue
 
-    const items = recipe.ingredients ?? []
-    const names = distinct(items.map(item => item.name))
-    const distractors = distinct(ingredients, names)
-    const group = groups.get(recipeCategory) ?? { composition: [], amount: [] }
-    if (names.length && distractors.length) {
-      group.composition.push(makeQuestion(recipe, 'Какой ингредиент входит в состав?', shuffle(names)[0], distractors))
+    const correct = new Map(items.map(item => [normalize(item.label), item]))
+    const names = new Set(items.map(item => item.nameKey))
+    const unrelated = pool.filter(item => !names.has(item.nameKey))
+    const shuffledItems = shuffle([...correct.values()])
+    const parts = Math.ceil(shuffledItems.length / maxAnswers)
+    const partSize = Math.ceil(shuffledItems.length / parts)
+    const recipeQuestions: Question[] = []
+
+    for (let part = 0; part < parts; part++) {
+      const partItems = shuffledItems.slice(part * partSize, (part + 1) * partSize)
+      const answers = partItems.map(item => item.label)
+      const remaining = optionCount - answers.length
+      const distractors = new Map<string, string>()
+      function add(label: string) {
+        const key = normalize(label)
+        if (key && !correct.has(key) && !distractors.has(key) && distractors.size < remaining) distractors.set(key, label)
+      }
+
+      const nearby = shuffle(partItems.flatMap(item => [-2, -1, 1, 2].map(offset => item.alternative(offset * item.step))).filter(Boolean))
+      nearby.slice(0, Math.ceil(remaining / 2)).forEach(add)
+      for (const item of unrelated) {
+        if (distractors.size === remaining) break
+        add(item.label)
+      }
+      for (let offset = 1; offset <= optionCount * 2 && distractors.size < remaining; offset++) {
+        for (const item of partItems) add(item.alternative(offset * item.step))
+      }
+
+      if (distractors.size === remaining) {
+        recipeQuestions.push({ recipe, answers, part: part + 1, parts, options: shuffle([...answers, ...distractors.values()]) })
+      }
     }
 
-    const counts = new Map<string, number>()
-    for (const item of items) {
-      const key = normalize(item.name)
-      counts.set(key, (counts.get(key) ?? 0) + 1)
-    }
-    for (const item of shuffle(items)) {
-      const key = normalize(item.name)
-      if (!key || counts.get(key) !== 1) continue
-      const question = amountQuestion(recipe, item)
-      if (!question) continue
-      group.amount.push(question)
-      break
-    }
-
-    if (group.composition.length || group.amount.length) groups.set(recipeCategory, group)
+    if (recipeQuestions.length !== parts) continue
+    const bank = groups.get(recipeCategory) ?? []
+    bank.push(recipeQuestions)
+    groups.set(recipeCategory, bank)
   }
 
-  const banks = [...groups.values()].map(bank => ({ ...bank, amount: shuffle(bank.amount) }))
+  const banks = [...groups.values()]
   const questions: Question[] = []
   const limit = Math.max(10, banks.length)
-  const totals = { composition: 0, amount: 0 }
-  while (questions.length < limit) {
-    const before = questions.length
+  let recipesChosen = 0
+  while (recipesChosen < limit) {
+    const before = recipesChosen
     for (const bank of banks) {
-      const preferred = totals.composition <= totals.amount ? 'composition' : 'amount'
-      const other = preferred === 'composition' ? 'amount' : 'composition'
-      const kind = bank[preferred].length ? preferred : other
-      const question = bank[kind].pop()
-      if (!question) continue
-      questions.push(question)
-      totals[kind]++
-      if (questions.length === limit) break
+      const next = bank.pop()
+      if (!next) continue
+      questions.push(...next)
+      if (++recipesChosen === limit) break
     }
-    if (questions.length === before) break
+    if (recipesChosen === before) break
   }
   return questions
 }

@@ -202,9 +202,20 @@ html { scrollbar-gutter: stable; }
   text-align: left;
 }
 .quiz-category select { width: 100%; }
-.quiz-option { min-height: 47px; }
-.quiz-option:enabled:hover, .quiz-option:focus-visible { border-color: var(--accent2); }
-.quiz-option:disabled { opacity: 1; cursor: default; }
+.quiz-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 47px;
+  cursor: pointer;
+}
+.quiz-option span { overflow-wrap: anywhere; }
+.quiz-option input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent2); }
+.quiz-option:has(input:focus-visible), .quiz-option:has(input:enabled):hover,
+.quiz-option:has(input:enabled:checked) { border-color: var(--accent2); }
+.quiz-option:has(input:disabled) { cursor: default; }
+.quiz-option-result { font-size: .75rem; }
 .quiz-option.quiz-correct { border-color: #609466; background: color-mix(in srgb, var(--panel) 77%, #6bb477); }
 .quiz-option.quiz-wrong { border-color: #b8635a; background: color-mix(in srgb, var(--panel) 77%, #d67d70); }
 .quiz-feedback { display: grid; align-content: start; justify-items: start; gap: 4px; min-height: 65px; padding-top: 12px; }

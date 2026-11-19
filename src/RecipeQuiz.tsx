@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { Recipe } from './types'
-import { createRecipeQuiz } from './quizQuestions'
+import { createRecipeQuiz, isCorrectAnswer } from './quizQuestions'
 import type { Question } from './quizQuestions'
 
 type Props = {
@@ -14,20 +14,22 @@ type Props = {
 export function RecipeQuiz({ recipes, loading, loadError, onReload, onOpenRecipe }: Props) {
   const [category, setCategory] = useState<string | null>(null)
   const [questions, setQuestions] = useState<Question[]>([])
-  const [answers, setAnswers] = useState<string[]>([])
+  const [answers, setAnswers] = useState<string[][]>([])
+  const [selection, setSelection] = useState<string[]>([])
   const [index, setIndex] = useState(0)
   const [unavailable, setUnavailable] = useState(false)
 
   const categories = [...new Set(recipes.map(recipe => recipe.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru'))
   const chosenCategory = category && categories.includes(category) ? category : null
   const question = questions[index]
-  const selected = answers[index]
-  const mistakes = questions.filter((item, position) => item.answer !== answers[position])
+  const submitted = answers[index]
+  const mistakes = questions.filter((item, position) => !isCorrectAnswer(item, answers[position] ?? []))
   const complete = questions.length > 0 && index === questions.length
 
   function start(newQuestions: Question[]) {
     setQuestions(newQuestions)
     setAnswers([])
+    setSelection([])
     setIndex(0)
     setUnavailable(!newQuestions.length)
   }
@@ -35,19 +37,25 @@ export function RecipeQuiz({ recipes, loading, loadError, onReload, onOpenRecipe
   function reset() {
     setQuestions([])
     setAnswers([])
+    setSelection([])
     setIndex(0)
     setUnavailable(false)
+  }
+
+  function advance() {
+    setSelection([])
+    setIndex(index + 1)
   }
 
   return <div className="quiz-page">
     <div className="page-heading"><div><h1>Тест</h1><p>Проверь, помнишь ли ты состав и количество ингредиентов.</p></div></div>
     {complete ? <section className="quiz-card">
       <h2>Результат</h2>
-      <p role="status">Правильных ответов: <strong>{questions.length - mistakes.length} из {questions.length}</strong></p>
+      <p role="status">Вопросов без ошибок: <strong>{questions.length - mistakes.length} из {questions.length}</strong></p>
       {!!mistakes.length && <ul className="quiz-review">
-        {mistakes.map(item => <li key={JSON.stringify([item.recipe.id, item.prompt])}>
+        {mistakes.map(item => <li key={JSON.stringify([item.recipe.id, item.part])}>
           <button className="quiz-link" onClick={() => onOpenRecipe(item.recipe)}>{item.recipe.name}</button>
-          <span>{item.prompt} <strong>{item.answer}</strong></span>
+          <span>{item.answers.join('; ')}</span>
         </li>)}
       </ul>}
       <div className="quiz-actions">
@@ -56,29 +64,34 @@ export function RecipeQuiz({ recipes, loading, loadError, onReload, onOpenRecipe
       </div>
     </section> : question ? <section className="quiz-card">
       <div className="quiz-progress">Вопрос {index + 1} из {questions.length}</div>
-      <progress aria-label="Прогресс теста" value={index + Number(selected !== undefined)} max={questions.length}/>
+      <progress aria-label="Прогресс теста" value={index + Number(submitted !== undefined)} max={questions.length}/>
       <h2>{question.recipe.name}</h2>
-      <p>{question.prompt}</p>
-      <div className="quiz-options">
+      <p id="quiz-instructions">{question.parts > 1 ? `Часть ${question.part} из ${question.parts}. ` : ''}Выбери все подходящие ингредиенты с правильным количеством.</p>
+      <div className="quiz-options" role="group" aria-labelledby="quiz-instructions">
         {question.options.map(option => {
-          const correct = selected !== undefined && option === question.answer
-          const wrong = option === selected && !correct
-          return <button key={option} className={'quiz-option' + (correct ? ' quiz-correct' : wrong ? ' quiz-wrong' : '')}
-            disabled={selected !== undefined} onClick={() => setAnswers(previous => previous.length === index ? [...previous, option] : previous)}>
-            {correct && '✓ '}{wrong && '✕ '}{option}
-          </button>
+          const checked = selection.includes(option)
+          const correct = submitted !== undefined && question.answers.includes(option)
+          const wrong = submitted !== undefined && checked && !correct
+          const resultClass = correct ? ' quiz-correct' : wrong ? ' quiz-wrong' : ''
+          return <label key={option} className={`quiz-option${resultClass}`}>
+            <input type="checkbox" checked={checked} disabled={submitted !== undefined} onChange={event => {
+              const nextChecked = event.target.checked
+              setSelection(previous => nextChecked ? [...previous, option] : previous.filter(value => value !== option))
+            }}/>
+            <span>{option}</span>
+            {correct && <span className="quiz-option-result">{checked ? 'Верно' : 'Пропущено'}</span>}
+            {wrong && <span className="quiz-option-result">Лишнее</span>}
+          </label>
         })}
       </div>
-      <div className="quiz-feedback" aria-live="polite">
-        {selected !== undefined && <>
-          <strong>{selected === question.answer ? 'Верно' : 'Правильный ответ: ' + question.answer}</strong>
-          <button className="quiz-link" onClick={() => onOpenRecipe(question.recipe)}>Открыть техкарту</button>
-        </>}
-      </div>
+      {submitted !== undefined && <div className="quiz-feedback" role="status">
+        <strong>{isCorrectAnswer(question, submitted) ? 'Всё верно' : 'Проверь отмеченные ошибки'}</strong>
+        <button className="quiz-link" onClick={() => onOpenRecipe(question.recipe)}>Открыть техкарту</button>
+      </div>}
       <div className="quiz-actions">
-        <button className="primary-btn" disabled={selected === undefined} onClick={() => setIndex(index + 1)}>
-          {index + 1 === questions.length ? 'Показать результат' : 'Следующий вопрос'}
-        </button>
+        {submitted === undefined
+          ? <button className="primary-btn" disabled={!selection.length} onClick={() => setAnswers(previous => previous.length === index ? [...previous, selection] : previous)}>Проверить</button>
+          : <button className="primary-btn" onClick={advance}>{index + 1 === questions.length ? 'Показать результат' : 'Следующий вопрос'}</button>}
         <button className="subtle-btn" onClick={reset}>Завершить тест</button>
       </div>
     </section> : <section className="quiz-card">
